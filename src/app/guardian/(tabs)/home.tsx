@@ -18,7 +18,6 @@ export default function GuardianHomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.eyebrow}>든든 보호자</Text>
 
         <Text style={styles.title}>
           김영희님의 금융 안전을{'\n'}
