@@ -1,6 +1,14 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
 import {
+  router,
+  useLocalSearchParams,
+} from 'expo-router';
+import {
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -21,7 +29,15 @@ import {
   guardianTypography,
   seniorTypography,
 } from '@/constants/typography';
-import type { UserRole } from '@/types/user';
+import {
+  getApiErrorMessage,
+  loginAndSaveToken,
+  signup,
+} from '@/services/auth';
+import type {
+  ApiUserRole,
+  UserRole,
+} from '@/types/user';
 
 const MOCK_AUTH_CODE = '123456';
 
@@ -29,96 +45,173 @@ type SignupStep =
   | 'name'
   | 'birth'
   | 'phone'
-  | 'code';
+  | 'code'
+  | 'password';
 
 export default function LoginScreen() {
   const params =
-    useLocalSearchParams<{ role?: UserRole }>();
+    useLocalSearchParams<{
+      role?: UserRole;
+    }>();
 
   const role: UserRole =
     params.role === 'guardian'
       ? 'guardian'
       : 'senior';
 
-  const isSenior = role === 'senior';
+  const isSenior =
+    role === 'senior';
 
   const typography = isSenior
     ? seniorTypography
     : guardianTypography;
 
-  const scrollRef = useRef<ScrollView>(null);
-  const birthInputRef = useRef<TextInput>(null);
-  const phoneInputRef = useRef<TextInput>(null);
-  const codeInputRef = useRef<TextInput>(null);
+  const scrollRef =
+    useRef<ScrollView>(null);
+
+  const birthInputRef =
+    useRef<TextInput>(null);
+
+  const phoneInputRef =
+    useRef<TextInput>(null);
+
+  const codeInputRef =
+    useRef<TextInput>(null);
+
+  const passwordInputRef =
+    useRef<TextInput>(null);
 
   const [step, setStep] =
     useState<SignupStep>('name');
 
-  const [name, setName] = useState('');
-  const [birthDate, setBirthDate] =
+  const [name, setName] =
     useState('');
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
 
-  const nameValid = useMemo(() => {
-    return name.trim().length >= 2;
-  }, [name]);
+  const [
+    birthDate,
+    setBirthDate,
+  ] = useState('');
 
-  const birthDateValid = useMemo(() => {
-    if (birthDate.length !== 8) {
-      return false;
-    }
+  const [phone, setPhone] =
+    useState('');
 
-    const year = Number(
-      birthDate.slice(0, 4),
-    );
+  const [code, setCode] =
+    useState('');
 
-    const month = Number(
-      birthDate.slice(4, 6),
-    );
+  const [
+    password,
+    setPassword,
+  ] = useState('');
 
-    const day = Number(
-      birthDate.slice(6, 8),
-    );
+  const [
+    passwordConfirm,
+    setPasswordConfirm,
+  ] = useState('');
 
-    if (year < 1900) return false;
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false);
 
-    if (month < 1 || month > 12) {
-      return false;
-    }
+  const [
+    isSubmitting,
+    setIsSubmitting,
+  ] = useState(false);
 
-    const lastDay = new Date(
-      year,
-      month,
-      0,
-    ).getDate();
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState('');
 
-    if (day < 1 || day > lastDay) {
-      return false;
-    }
+  const nameValid = useMemo(
+    () =>
+      name.trim().length >= 2,
+    [name],
+  );
 
-    return true;
-  }, [birthDate]);
+  const birthDateValid =
+    useMemo(() => {
+      if (
+        birthDate.length !== 8
+      ) {
+        return false;
+      }
 
-  const phoneValid = useMemo(() => {
-    const numbersOnly =
-      phone.replace(/\D/g, '');
+      const year = Number(
+        birthDate.slice(0, 4),
+      );
 
-    return (
-      numbersOnly.length >= 10 &&
-      numbersOnly.length <= 11
-    );
-  }, [phone]);
+      const month = Number(
+        birthDate.slice(4, 6),
+      );
 
-  const codeValid = code.length === 6;
+      const day = Number(
+        birthDate.slice(6, 8),
+      );
+
+      if (year < 1900) {
+        return false;
+      }
+
+      if (
+        month < 1 ||
+        month > 12
+      ) {
+        return false;
+      }
+
+      const lastDay =
+        new Date(
+          year,
+          month,
+          0,
+        ).getDate();
+
+      if (
+        day < 1 ||
+        day > lastDay
+      ) {
+        return false;
+      }
+
+      const inputDate =
+        new Date(
+          year,
+          month - 1,
+          day,
+        );
+
+      return (
+        inputDate < new Date()
+      );
+    }, [birthDate]);
+
+  const phoneValid =
+    useMemo(() => {
+      return /^01[0-9]{8,9}$/.test(
+        phone,
+      );
+    }, [phone]);
+
+  const codeValid =
+    code === MOCK_AUTH_CODE;
+
+  const passwordValid =
+    password.length >= 8 &&
+    password ===
+      passwordConfirm;
 
   const focusNextInput = (
-    ref: React.RefObject<TextInput | null>,
+    ref: React.RefObject<
+      TextInput | null
+    >,
   ) => {
     setTimeout(() => {
-      scrollRef.current?.scrollToEnd({
-        animated: true,
-      });
+      scrollRef.current?.scrollToEnd(
+        {
+          animated: true,
+        },
+      );
 
       setTimeout(() => {
         ref.current?.focus();
@@ -132,99 +225,220 @@ export default function LoginScreen() {
     Keyboard.dismiss();
 
     setStep('birth');
-    focusNextInput(birthInputRef);
+
+    focusNextInput(
+      birthInputRef,
+    );
   };
 
   const handleBirthNext = () => {
-    if (!birthDateValid) return;
+    if (!birthDateValid) {
+      return;
+    }
 
     Keyboard.dismiss();
 
     setStep('phone');
-    focusNextInput(phoneInputRef);
+
+    focusNextInput(
+      phoneInputRef,
+    );
   };
 
-  const handleRequestCode = () => {
-    if (!phoneValid) return;
+  const handleRequestCode =
+    () => {
+      if (!phoneValid) return;
 
-    Keyboard.dismiss();
+      Keyboard.dismiss();
 
-    setCode('');
-    setStep('code');
+      setCode('');
+      setErrorMessage('');
+      setStep('code');
 
-    focusNextInput(codeInputRef);
-  };
+      focusNextInput(
+        codeInputRef,
+      );
+    };
 
-  const handleResendCode = () => {
-    Keyboard.dismiss();
+  const handleResendCode =
+    () => {
+      Keyboard.dismiss();
 
-    setCode('');
+      setCode('');
+      setErrorMessage('');
 
-    focusNextInput(codeInputRef);
-  };
+      focusNextInput(
+        codeInputRef,
+      );
+    };
 
   const handleCodeChange = (
     value: string,
   ) => {
-    const numbersOnly = value
-      .replace(/\D/g, '')
-      .slice(0, 6);
+    const numbersOnly =
+      value
+        .replace(/\D/g, '')
+        .slice(0, 6);
 
     setCode(numbersOnly);
+    setErrorMessage('');
   };
 
-  const handleComplete = () => {
-    if (!codeValid) return;
+  const handleCodeNext = () => {
+    if (!codeValid) {
+      setErrorMessage(
+        '인증번호를 다시 확인해 주세요.',
+      );
+      return;
+    }
 
     Keyboard.dismiss();
 
-    router.push({
-      pathname: '/auth/family-connect',
-      params: {
-        role,
-        name: name.trim(),
-        birthDate,
-        phone,
-      },
-    });
+    setErrorMessage('');
+    setStep('password');
+
+    focusNextInput(
+      passwordInputRef,
+    );
   };
+
+  const formatBirthDateForApi =
+    (value: string) => {
+      return `${value.slice(
+        0,
+        4,
+      )}-${value.slice(
+        4,
+        6,
+      )}-${value.slice(6, 8)}`;
+    };
+
+  const handleSignup =
+    async () => {
+      if (
+        !passwordValid ||
+        isSubmitting
+      ) {
+        return;
+      }
+
+      Keyboard.dismiss();
+
+      setErrorMessage('');
+      setIsSubmitting(true);
+
+      const apiRole: ApiUserRole =
+        role === 'senior'
+          ? 'SENIOR'
+          : 'GUARDIAN';
+
+      try {
+        await signup({
+          name: name.trim(),
+          password,
+          role: apiRole,
+          phone,
+          birthDate:
+            formatBirthDateForApi(
+              birthDate,
+            ),
+        });
+
+        // 회원가입 성공 직후 로그인
+        // → JWT 저장
+        await loginAndSaveToken({
+          phone,
+          password,
+        });
+
+        router.replace({
+          pathname:
+            '/auth/family-connect',
+          params: {
+            role,
+          },
+        });
+      } catch (error) {
+        setErrorMessage(
+          getApiErrorMessage(
+            error,
+            '회원가입에 실패했어요. 잠시 후 다시 시도해 주세요.',
+          ),
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
   const getButtonInfo = () => {
     switch (step) {
       case 'name':
         return {
           text: '다음',
-          disabled: !nameValid,
-          onPress: handleNameNext,
+          disabled:
+            !nameValid,
+          onPress:
+            handleNameNext,
         };
 
       case 'birth':
         return {
           text: '다음',
-          disabled: !birthDateValid,
-          onPress: handleBirthNext,
+          disabled:
+            !birthDateValid,
+          onPress:
+            handleBirthNext,
         };
 
       case 'phone':
         return {
-          text: '인증번호 받기',
-          disabled: !phoneValid,
-          onPress: handleRequestCode,
+          text:
+            '인증번호 받기',
+          disabled:
+            !phoneValid,
+          onPress:
+            handleRequestCode,
         };
 
       case 'code':
         return {
           text: '확인',
-          disabled: !codeValid,
-          onPress: handleComplete,
+          disabled:
+            code.length !== 6,
+          onPress:
+            handleCodeNext,
+        };
+
+      case 'password':
+        return {
+          text: '가입 완료',
+          disabled:
+            !passwordValid ||
+            isSubmitting,
+          onPress:
+            handleSignup,
         };
     }
   };
 
-  const buttonInfo = getButtonInfo();
+  const buttonInfo =
+    getButtonInfo();
+
+  const showBirth =
+    step === 'birth' ||
+    step === 'phone' ||
+    step === 'code' ||
+    step === 'password';
+
+  const showPhone =
+    step === 'phone' ||
+    step === 'code' ||
+    step === 'password';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+    >
       <TouchableWithoutFeedback
         onPress={Keyboard.dismiss}
         accessible={false}
@@ -237,10 +451,14 @@ export default function LoginScreen() {
               : undefined
           }
         >
-          <View style={styles.wrapper}>
+          <View
+            style={styles.wrapper}
+          >
             <ScrollView
               ref={scrollRef}
-              style={styles.scrollView}
+              style={
+                styles.scrollView
+              }
               contentContainerStyle={
                 styles.scrollContent
               }
@@ -253,7 +471,9 @@ export default function LoginScreen() {
                 delay={30}
                 distance={10}
               >
-                <Text style={styles.step}>
+                <Text
+                  style={styles.step}
+                >
                   2단계
                 </Text>
               </SlideFadeIn>
@@ -268,9 +488,10 @@ export default function LoginScreen() {
                     {
                       fontSize:
                         typography.pageTitle,
-                      lineHeight: isSenior
-                        ? 42
-                        : 38,
+                      lineHeight:
+                        isSenior
+                          ? 42
+                          : 38,
                     },
                   ]}
                 >
@@ -287,16 +508,19 @@ export default function LoginScreen() {
                   style={[
                     styles.subtitle,
                     {
-                      fontSize: isSenior
-                        ? 20
-                        : 17,
-                      lineHeight: isSenior
-                        ? 30
-                        : 26,
+                      fontSize:
+                        isSenior
+                          ? 20
+                          : 17,
+                      lineHeight:
+                        isSenior
+                          ? 30
+                          : 26,
                     },
                   ]}
                 >
-                  본인 확인에 필요한 정보를
+                  본인 확인에 필요한
+                  정보를{`\n`}
                   하나씩 확인할게요.
                 </Text>
               </SlideFadeIn>
@@ -310,9 +534,10 @@ export default function LoginScreen() {
                     style={[
                       styles.label,
                       {
-                        fontSize: isSenior
-                          ? 18
-                          : 15,
+                        fontSize:
+                          isSenior
+                            ? 18
+                            : 15,
                       },
                     ]}
                   >
@@ -321,16 +546,26 @@ export default function LoginScreen() {
 
                   <TextInput
                     value={name}
-                    onChangeText={setName}
+                    onChangeText={(
+                      value,
+                    ) => {
+                      setName(value);
+
+                      setErrorMessage(
+                        '',
+                      );
+                    }}
                     style={[
                       styles.input,
                       {
-                        height: isSenior
-                          ? 68
-                          : 60,
-                        fontSize: isSenior
-                          ? 20
-                          : 17,
+                        height:
+                          isSenior
+                            ? 68
+                            : 60,
+                        fontSize:
+                          isSenior
+                            ? 20
+                            : 17,
                       },
                     ]}
                     placeholder="이름을 입력해 주세요"
@@ -339,7 +574,9 @@ export default function LoginScreen() {
                     returnKeyType="next"
                     autoFocus
                     onSubmitEditing={() => {
-                      if (nameValid) {
+                      if (
+                        nameValid
+                      ) {
                         handleNameNext();
                       }
                     }}
@@ -347,11 +584,7 @@ export default function LoginScreen() {
                 </View>
               </SlideFadeIn>
 
-              {(
-                step === 'birth' ||
-                step === 'phone' ||
-                step === 'code'
-              ) && (
+              {showBirth && (
                 <SlideFadeIn
                   key="birth-step"
                   duration={380}
@@ -362,9 +595,10 @@ export default function LoginScreen() {
                       style={[
                         styles.label,
                         {
-                          fontSize: isSenior
-                            ? 18
-                            : 15,
+                          fontSize:
+                            isSenior
+                              ? 18
+                              : 15,
                         },
                       ]}
                     >
@@ -372,27 +606,45 @@ export default function LoginScreen() {
                     </Text>
 
                     <TextInput
-                      ref={birthInputRef}
-                      value={birthDate}
-                      onChangeText={(value) => {
+                      ref={
+                        birthInputRef
+                      }
+                      value={
+                        birthDate
+                      }
+                      onChangeText={(
+                        value,
+                      ) => {
                         const numbersOnly =
                           value
-                            .replace(/\D/g, '')
-                            .slice(0, 8);
+                            .replace(
+                              /\D/g,
+                              '',
+                            )
+                            .slice(
+                              0,
+                              8,
+                            );
 
                         setBirthDate(
                           numbersOnly,
+                        );
+
+                        setErrorMessage(
+                          '',
                         );
                       }}
                       style={[
                         styles.input,
                         {
-                          height: isSenior
-                            ? 68
-                            : 60,
-                          fontSize: isSenior
-                            ? 20
-                            : 17,
+                          height:
+                            isSenior
+                              ? 68
+                              : 60,
+                          fontSize:
+                            isSenior
+                              ? 20
+                              : 17,
                         },
                       ]}
                       placeholder="19580412"
@@ -402,18 +654,18 @@ export default function LoginScreen() {
                     />
 
                     <Text
-                      style={styles.inputHint}
+                      style={
+                        styles.inputHint
+                      }
                     >
-                      생년월일 8자리를 입력해 주세요.
+                      생년월일 8자리를
+                      입력해 주세요.
                     </Text>
                   </View>
                 </SlideFadeIn>
               )}
 
-              {(
-                step === 'phone' ||
-                step === 'code'
-              ) && (
+              {showPhone && (
                 <SlideFadeIn
                   key="phone-step"
                   duration={380}
@@ -424,9 +676,10 @@ export default function LoginScreen() {
                       style={[
                         styles.label,
                         {
-                          fontSize: isSenior
-                            ? 18
-                            : 15,
+                          fontSize:
+                            isSenior
+                              ? 18
+                              : 15,
                         },
                       ]}
                     >
@@ -434,25 +687,43 @@ export default function LoginScreen() {
                     </Text>
 
                     <TextInput
-                      ref={phoneInputRef}
+                      ref={
+                        phoneInputRef
+                      }
                       value={phone}
-                      onChangeText={(value) => {
+                      onChangeText={(
+                        value,
+                      ) => {
                         const numbersOnly =
                           value
-                            .replace(/\D/g, '')
-                            .slice(0, 11);
+                            .replace(
+                              /\D/g,
+                              '',
+                            )
+                            .slice(
+                              0,
+                              11,
+                            );
 
-                        setPhone(numbersOnly);
+                        setPhone(
+                          numbersOnly,
+                        );
+
+                        setErrorMessage(
+                          '',
+                        );
                       }}
                       style={[
                         styles.input,
                         {
-                          height: isSenior
-                            ? 68
-                            : 60,
-                          fontSize: isSenior
-                            ? 20
-                            : 17,
+                          height:
+                            isSenior
+                              ? 68
+                              : 60,
+                          fontSize:
+                            isSenior
+                              ? 20
+                              : 17,
                         },
                       ]}
                       placeholder="01012345678"
@@ -464,7 +735,10 @@ export default function LoginScreen() {
                 </SlideFadeIn>
               )}
 
-              {step === 'code' && (
+              {(
+                step === 'code' ||
+                step === 'password'
+              ) && (
                 <SlideFadeIn
                   key="code-step"
                   duration={380}
@@ -480,19 +754,138 @@ export default function LoginScreen() {
                         style={[
                           styles.codeLabel,
                           {
-                            fontSize: isSenior
-                              ? 18
-                              : 15,
+                            fontSize:
+                              isSenior
+                                ? 18
+                                : 15,
                           },
                         ]}
                       >
                         인증번호
                       </Text>
 
+                      {step ===
+                        'code' && (
+                        <TouchableOpacity
+                          activeOpacity={
+                            0.7
+                          }
+                          onPress={
+                            handleResendCode
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.resend,
+                              {
+                                fontSize:
+                                  isSenior
+                                    ? 18
+                                    : 15,
+                              },
+                            ]}
+                          >
+                            다시 받기
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <TextInput
+                      ref={
+                        codeInputRef
+                      }
+                      value={code}
+                      onChangeText={
+                        handleCodeChange
+                      }
+                      editable={
+                        step === 'code'
+                      }
+                      style={[
+                        styles.input,
+                        styles.codeInput,
+                        step ===
+                          'password' &&
+                          styles.completedInput,
+                        {
+                          height:
+                            isSenior
+                              ? 68
+                              : 60,
+                          fontSize:
+                            isSenior
+                              ? 24
+                              : 20,
+                        },
+                      ]}
+                      placeholder="6자리 입력"
+                      placeholderTextColor="#B0B8C1"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                    />
+
+                    {step ===
+                      'code' && (
+                      <Text
+                        style={[
+                          styles.mockHint,
+                          {
+                            fontSize:
+                              isSenior
+                                ? 16
+                                : 14,
+                          },
+                        ]}
+                      >
+                        시연용 인증번호:{' '}
+                        {
+                          MOCK_AUTH_CODE
+                        }
+                      </Text>
+                    )}
+                  </View>
+                </SlideFadeIn>
+              )}
+
+              {step ===
+                'password' && (
+                <SlideFadeIn
+                  key="password-step"
+                  duration={380}
+                  distance={14}
+                >
+                  <View>
+                    <View
+                      style={
+                        styles.passwordLabelRow
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.codeLabel,
+                          {
+                            fontSize:
+                              isSenior
+                                ? 18
+                                : 15,
+                          },
+                        ]}
+                      >
+                        비밀번호
+                      </Text>
+
                       <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={
-                          handleResendCode
+                        activeOpacity={
+                          0.7
+                        }
+                        onPress={() =>
+                          setShowPassword(
+                            (
+                              prev,
+                            ) =>
+                              !prev,
+                          )
                         }
                       >
                         <Text
@@ -506,63 +899,164 @@ export default function LoginScreen() {
                             },
                           ]}
                         >
-                          다시 받기
+                          {showPassword
+                            ? '숨기기'
+                            : '보기'}
                         </Text>
                       </TouchableOpacity>
                     </View>
 
                     <TextInput
-                      ref={codeInputRef}
-                      value={code}
-                      onChangeText={
-                        handleCodeChange
+                      ref={
+                        passwordInputRef
                       }
+                      value={
+                        password
+                      }
+                      onChangeText={(
+                        value,
+                      ) => {
+                        setPassword(
+                          value,
+                        );
+
+                        setErrorMessage(
+                          '',
+                        );
+                      }}
                       style={[
                         styles.input,
-                        styles.codeInput,
                         {
-                          height: isSenior
-                            ? 68
-                            : 60,
-                          fontSize: isSenior
-                            ? 24
-                            : 20,
+                          height:
+                            isSenior
+                              ? 68
+                              : 60,
+                          fontSize:
+                            isSenior
+                              ? 20
+                              : 17,
                         },
                       ]}
-                      placeholder="6자리 입력"
+                      placeholder="8자 이상 입력해 주세요"
                       placeholderTextColor="#B0B8C1"
-                      keyboardType="number-pad"
-                      maxLength={6}
+                      secureTextEntry={
+                        !showPassword
+                      }
+                      autoCapitalize="none"
+                      autoCorrect={false}
                     />
 
                     <Text
                       style={[
-                        styles.mockHint,
+                        styles.passwordConfirmLabel,
                         {
-                          fontSize: isSenior
-                            ? 16
-                            : 14,
+                          fontSize:
+                            isSenior
+                              ? 18
+                              : 15,
                         },
                       ]}
                     >
-                      시연용 인증번호:{' '}
-                      {MOCK_AUTH_CODE}
+                      비밀번호 확인
                     </Text>
+
+                    <TextInput
+                      value={
+                        passwordConfirm
+                      }
+                      onChangeText={(
+                        value,
+                      ) => {
+                        setPasswordConfirm(
+                          value,
+                        );
+
+                        setErrorMessage(
+                          '',
+                        );
+                      }}
+                      style={[
+                        styles.input,
+                        {
+                          height:
+                            isSenior
+                              ? 68
+                              : 60,
+                          fontSize:
+                            isSenior
+                              ? 20
+                              : 17,
+                        },
+                      ]}
+                      placeholder="비밀번호를 한 번 더 입력해 주세요"
+                      placeholderTextColor="#B0B8C1"
+                      secureTextEntry={
+                        !showPassword
+                      }
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={
+                        handleSignup
+                      }
+                    />
+
+                    <Text
+                      style={
+                        styles.inputHint
+                      }
+                    >
+                      비밀번호는 8자
+                      이상 입력해 주세요.
+                    </Text>
+
+                    {passwordConfirm.length >
+                      0 &&
+                      password !==
+                        passwordConfirm && (
+                        <Text
+                          style={
+                            styles.errorText
+                          }
+                        >
+                          비밀번호가 서로
+                          달라요.
+                        </Text>
+                      )}
                   </View>
                 </SlideFadeIn>
               )}
 
-              <View style={styles.bottomSpacer} />
+              {!!errorMessage && (
+                <Text
+                  style={
+                    styles.errorText
+                  }
+                >
+                  {errorMessage}
+                </Text>
+              )}
+
+              <View
+                style={
+                  styles.bottomSpacer
+                }
+              />
             </ScrollView>
 
-            <View style={styles.buttonArea}>
+            <View
+              style={
+                styles.buttonArea
+              }
+            >
               <TouchableOpacity
                 style={[
                   styles.button,
                   {
-                    height: isSenior
-                      ? 64
-                      : 56,
+                    height:
+                      isSenior
+                        ? 64
+                        : 56,
                   },
                   buttonInfo.disabled &&
                     styles.disabledButton,
@@ -575,17 +1069,25 @@ export default function LoginScreen() {
                   buttonInfo.onPress
                 }
               >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    {
-                      fontSize:
-                        typography.button,
-                    },
-                  ]}
-                >
-                  {buttonInfo.text}
-                </Text>
+                {isSubmitting ? (
+                  <ActivityIndicator
+                    color={
+                      colors.white
+                    }
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      {
+                        fontSize:
+                          typography.button,
+                      },
+                    ]}
+                  >
+                    {buttonInfo.text}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -595,124 +1097,171 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        colors.background,
+    },
 
-  flex: {
-    flex: 1,
-  },
+    flex: {
+      flex: 1,
+    },
 
-  wrapper: {
-    flex: 1,
-  },
+    wrapper: {
+      flex: 1,
+    },
 
-  scrollView: {
-    flex: 1,
-  },
+    scrollView: {
+      flex: 1,
+    },
 
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 48,
-    paddingBottom: 24,
-  },
+    scrollContent: {
+      paddingHorizontal: 24,
+      paddingTop: 48,
+      paddingBottom: 24,
+    },
 
-  step: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.primary,
-    marginBottom: 16,
-  },
+    step: {
+      fontSize: 16,
+      fontFamily:
+        fonts.semiBold,
+      color: colors.primary,
+      marginBottom: 16,
+    },
 
-  title: {
-    fontFamily: fonts.bold,
-    color: colors.text,
-  },
+    title: {
+      fontFamily: fonts.bold,
+      color: colors.text,
+    },
 
-  subtitle: {
-    marginTop: 12,
-    fontFamily: fonts.regular,
-    color: colors.muted,
-  },
+    subtitle: {
+      marginTop: 12,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+    },
 
-  label: {
-    marginTop: 32,
-    marginBottom: 10,
-    fontFamily: fonts.semiBold,
-    color: '#4E5968',
-  },
+    label: {
+      marginTop: 32,
+      marginBottom: 10,
+      fontFamily:
+        fonts.semiBold,
+      color: '#4E5968',
+    },
 
-  input: {
-    borderRadius: 16,
-    backgroundColor: colors.white,
-    paddingHorizontal: 20,
-    fontFamily: fonts.regular,
-    color: colors.text,
-  },
+    input: {
+      borderRadius: 16,
+      backgroundColor:
+        colors.white,
+      paddingHorizontal: 20,
+      fontFamily:
+        fonts.regular,
+      color: colors.text,
+    },
 
-  inputHint: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: fonts.regular,
-    color: colors.muted,
-  },
+    completedInput: {
+      color: colors.muted,
+    },
 
-  codeLabelRow: {
-    marginTop: 32,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+    inputHint: {
+      marginTop: 8,
+      fontSize: 14,
+      lineHeight: 20,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+    },
 
-  codeLabel: {
-    fontFamily: fonts.semiBold,
-    color: '#4E5968',
-  },
+    codeLabelRow: {
+      marginTop: 32,
+      marginBottom: 10,
+      flexDirection: 'row',
+      justifyContent:
+        'space-between',
+      alignItems: 'center',
+    },
 
-  resend: {
-    fontFamily: fonts.semiBold,
-    color: colors.primary,
-  },
+    passwordLabelRow: {
+      marginTop: 32,
+      marginBottom: 10,
+      flexDirection: 'row',
+      justifyContent:
+        'space-between',
+      alignItems: 'center',
+    },
 
-  codeInput: {
-    letterSpacing: 4,
-    fontFamily: fonts.semiBold,
-  },
+    passwordConfirmLabel: {
+      marginTop: 24,
+      marginBottom: 10,
+      fontFamily:
+        fonts.semiBold,
+      color: '#4E5968',
+    },
 
-  mockHint: {
-    marginTop: 10,
-    fontFamily: fonts.regular,
-    color: colors.muted,
-  },
+    codeLabel: {
+      fontFamily:
+        fonts.semiBold,
+      color: '#4E5968',
+    },
 
-  bottomSpacer: {
-    height: 260,
-  },
+    resend: {
+      fontFamily:
+        fonts.semiBold,
+      color: colors.primary,
+    },
 
-  buttonArea: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 24,
-    backgroundColor: colors.background,
-  },
+    codeInput: {
+      letterSpacing: 4,
+      fontFamily:
+        fonts.semiBold,
+    },
 
-  button: {
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    mockHint: {
+      marginTop: 10,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+    },
 
-  disabledButton: {
-    backgroundColor: '#D1D6DB',
-  },
+    errorText: {
+      marginTop: 10,
+      fontSize: 15,
+      lineHeight: 22,
+      fontFamily:
+        fonts.medium,
+      color: '#F04452',
+    },
 
-  buttonText: {
-    fontFamily: fonts.bold,
-    color: colors.white,
-  },
-});
+    bottomSpacer: {
+      height: 260,
+    },
+
+    buttonArea: {
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: 24,
+      backgroundColor:
+        colors.background,
+    },
+
+    button: {
+      borderRadius: 18,
+      backgroundColor:
+        colors.primary,
+      alignItems: 'center',
+      justifyContent:
+        'center',
+    },
+
+    disabledButton: {
+      backgroundColor:
+        '#D1D6DB',
+    },
+
+    buttonText: {
+      fontFamily: fonts.bold,
+      color: colors.white,
+    },
+  });
