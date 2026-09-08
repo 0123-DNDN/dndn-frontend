@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import SlideFadeIn from '@/components/SlideFadeIn';
+import DevQuickLogin from '@/components/dev/DevQuickLogin';
 import { colors } from '@/constants/colors';
 import {
   fonts,
@@ -64,6 +65,10 @@ export default function StartScreen() {
         </View>
 
         <View style={styles.buttonArea}>
+          {process.env.EXPO_PUBLIC_APP_ENV === 'local' && (
+            <DevQuickLogin />
+          )}
+
           <TouchableOpacity
             style={styles.loginButton}
             activeOpacity={0.85}

@@ -18,7 +18,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.team0123.dndn"
     },
     "web": {
       "output": "static",
@@ -35,7 +36,17 @@
         }
       ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "든든이 음성 입력을 위해 마이크를 사용하도록 허용해 주세요.",
+          "speechRecognitionPermission": "든든이 말씀을 글자로 바꿀 수 있도록 음성 인식을 허용해 주세요.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -100,6 +100,78 @@ export type ContextAnalyzeResponse = {
   followUpQuestions: FollowUpQuestion[];
 };
 
+export type AiInputType = 'CHAT' | 'VOICE';
+
+export type AiBehavior = {
+  responseDelayMs: number | null;
+  typingDurationMs: number | null;
+  editCount: number;
+  fullDeleteCount: number;
+  typingPauseCount: number;
+  answerReversalCount: number;
+  confusionCount: number;
+  reexplanationCount: number;
+};
+
+export type AiVoiceCondition = {
+  speechDurationMs: number | null;
+  speechRate: number | null;
+  avgPauseDurationMs: number | null;
+  longPauseCount: number;
+};
+
+export type AiSessionResponse = {
+  sessionId: number;
+  startedAt: string;
+  endedAt: string | null;
+};
+
+export type AiMessageSaveResponse = {
+  sessionId: number;
+  messageId: number;
+  senderType: 'USER' | 'ASSISTANT';
+  inputType: AiInputType | null;
+  content: string;
+  createdAt: string;
+};
+
+export async function createAiSession(): Promise<AiSessionResponse> {
+  const response = await api.post<AiSessionResponse>('/api/ai/sessions');
+  return response.data;
+}
+
+export async function endAiSession(sessionId: number): Promise<AiSessionResponse> {
+  const response = await api.patch<AiSessionResponse>(`/api/ai/sessions/${sessionId}/end`);
+  return response.data;
+}
+
+export async function saveAiUserMessage(
+  sessionId: number,
+  request: {
+    inputType: AiInputType;
+    content: string;
+    behavior: AiBehavior | null;
+    voiceCondition: AiVoiceCondition | null;
+  },
+): Promise<AiMessageSaveResponse> {
+  const response = await api.post<AiMessageSaveResponse>(
+    `/api/ai/sessions/${sessionId}/messages`,
+    request,
+  );
+  return response.data;
+}
+
+export async function saveAiAssistantMessage(
+  sessionId: number,
+  content: string,
+): Promise<AiMessageSaveResponse> {
+  const response = await api.post<AiMessageSaveResponse>(
+    `/api/ai/sessions/${sessionId}/assistant-messages`,
+    { content },
+  );
+  return response.data;
+}
+
 export async function analyzeIntent(
   text: string,
   intentHint?: IntentHint,
