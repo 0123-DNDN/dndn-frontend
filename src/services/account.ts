@@ -1,3 +1,63 @@
-import type { Account } from '@/types/account';
+import { api } from '@/services/api';
 
-export async function getAccounts(): Promise<Account[]> { return []; }
+import type {
+  AccountBalanceResponse,
+  AccountConnectRequest,
+  AccountResponse,
+  AccountVerifyRequest,
+  AccountVerifyResponse,
+  CurrentUserResponse,
+} from '@/types/account';
+
+export async function getCurrentUser(): Promise<CurrentUserResponse> {
+  const response =
+    await api.get<CurrentUserResponse>(
+      '/api/users/me',
+    );
+
+  return response.data;
+}
+
+export async function verifyAccount(
+  request: AccountVerifyRequest,
+): Promise<AccountVerifyResponse> {
+  const response =
+    await api.post<AccountVerifyResponse>(
+      '/api/accounts/verify',
+      request,
+    );
+
+  return response.data;
+}
+
+export async function connectAccount(
+  request: AccountConnectRequest,
+): Promise<AccountResponse> {
+  const response =
+    await api.post<AccountResponse>(
+      '/api/accounts/connect',
+      request,
+    );
+
+  return response.data;
+}
+
+export async function getMainAccount(): Promise<AccountResponse> {
+  const response =
+    await api.get<AccountResponse>(
+      '/api/accounts/main',
+    );
+
+  return response.data;
+}
+
+export async function getAccountBalance(
+  accountId: number,
+): Promise<AccountBalanceResponse> {
+  const response =
+    await api.get<AccountBalanceResponse>(
+      `/api/accounts/${accountId}/balance`,
+    );
+
+  return response.data;
+}
