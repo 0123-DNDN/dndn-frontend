@@ -1,5 +1,9 @@
 import { router } from 'expo-router';
 import {
+  useEffect,
+  useState,
+} from 'react';
+import {
   SafeAreaView,
   StyleSheet,
   Text,
@@ -8,14 +12,39 @@ import {
 } from 'react-native';
 
 import { spacing } from '@/constants/spacing';
-import { fonts, seniorTypography } from '@/constants/typography';
+import {
+  fonts,
+  seniorTypography,
+} from '@/constants/typography';
+import { getMyProfile } from '@/services/user';
 
 export default function SeniorHomeScreen() {
+  const [userName, setUserName] =
+    useState('김영희');
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const user =
+          await getMyProfile();
+
+        setUserName(user.name);
+      } catch (error) {
+        console.log(
+          'USER PROFILE ERROR:',
+          error,
+        );
+      }
+    };
+
+    loadUser();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.greeting}>
-          김영희님,{'\n'}
+          {userName}님,{'\n'}
           무엇을 도와드릴까요?
         </Text>
 

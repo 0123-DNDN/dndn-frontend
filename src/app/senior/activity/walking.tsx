@@ -1,6 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import {
+  useEffect,
+  useState,
+} from 'react';
+import {
+  ActivityIndicator,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -14,28 +19,205 @@ import {
   fonts,
   seniorTypography,
 } from '@/constants/typography';
+import {
+  getTodayActivityByType,
+  saveActivityResult,
+} from '@/services/activity';
+import type {
+  TodayActivityResponse,
+} from '@/types/activity';
 
-const CURRENT_STEPS = 1840;
-const TARGET_STEPS = 3000;
+const DEMO_DEVICE_STEPS = 1840;
 
 export default function WalkingScreen() {
-  const progress = Math.min(
-    CURRENT_STEPS / TARGET_STEPS,
-    1,
-  );
+  const [
+    activity,
+    setActivity,
+  ] =
+    useState<TodayActivityResponse | null>(
+      null,
+    );
 
-  const remaining = Math.max(
-    TARGET_STEPS - CURRENT_STEPS,
-    0,
-  );
+  const [
+    currentSteps,
+    setCurrentSteps,
+  ] = useState(0);
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true);
+
+  const [
+    isSaving,
+    setIsSaving,
+  ] = useState(false);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState('');
+
+  useEffect(() => {
+    loadActivity();
+  }, []);
+
+  const loadActivity =
+    async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+
+        const result =
+          await getTodayActivityByType(
+            'WALKING',
+          );
+
+        setActivity(result);
+
+        setCurrentSteps(
+          result?.stepCount ?? 0,
+        );
+      } catch (error) {
+        console.log(
+          'WALKING LOAD ERROR:',
+          error,
+        );
+
+        setErrorMessage(
+          '걷기 정보를 불러오지 못했어요.',
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+  const targetSteps =
+    activity?.targetValue ??
+    3000;
+
+  const progress =
+    targetSteps > 0
+      ? Math.min(
+          currentSteps /
+            targetSteps,
+          1,
+        )
+      : 0;
+
+  const remaining =
+    Math.max(
+      targetSteps -
+        currentSteps,
+      0,
+    );
+
+  const completed =
+    activity?.completed ??
+    currentSteps >=
+      targetSteps;
+
+  const handleRefresh =
+    async () => {
+      if (
+        !activity ||
+        isSaving
+      ) {
+        return;
+      }
+
+      /*
+       * TODO:
+       * HealthKit / Health Connect 붙으면
+       * DEMO_DEVICE_STEPS 대신
+       * 실제 걸음 수를 넣으면 됨.
+       */
+      const syncedSteps =
+        DEMO_DEVICE_STEPS;
+
+      try {
+        setIsSaving(true);
+        setErrorMessage('');
+
+        const result =
+          await saveActivityResult(
+            activity.activityId,
+            {
+              stepCount:
+                syncedSteps,
+            },
+          );
+
+        setCurrentSteps(
+          result.stepCount ??
+            syncedSteps,
+        );
+
+        setActivity(
+          (prev) =>
+            prev
+              ? {
+                  ...prev,
+                  stepCount:
+                    result.stepCount,
+                  status:
+                    result.status,
+                  completed:
+                    result.status ===
+                    'COMPLETED',
+                }
+              : prev,
+        );
+      } catch (error) {
+        console.log(
+          'WALKING SAVE ERROR:',
+          error,
+        );
+
+        setErrorMessage(
+          '걸음 수를 저장하지 못했어요.',
+        );
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView
+        style={styles.container}
+      >
+        <View
+          style={
+            styles.loadingContainer
+          }
+        >
+          <ActivityIndicator
+            size="large"
+            color={
+              colors.primary
+            }
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.screen}>
+    <SafeAreaView
+      style={styles.container}
+    >
+      <View
+        style={styles.screen}
+      >
         <View>
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
+            style={
+              styles.backButton
+            }
+            onPress={() =>
+              router.back()
+            }
           >
             <Ionicons
               name="chevron-back"
@@ -44,112 +226,216 @@ export default function WalkingScreen() {
             />
           </TouchableOpacity>
 
-          <Text style={styles.pageLabel}>
+          <Text
+            style={
+              styles.pageLabel
+            }
+          >
             오늘 걷기
           </Text>
 
-          <Text style={styles.title}>
+          <Text
+            style={styles.title}
+          >
             오늘도 천천히{'\n'}
             걸어볼까요?
           </Text>
 
-          <Text style={styles.description}>
+          <Text
+            style={
+              styles.description
+            }
+          >
             평소처럼 걸으면 걸음 수가
             자동으로 기록돼요.
           </Text>
         </View>
 
-        <View style={styles.stepCard}>
-          <View style={styles.walkIcon}>
+        <View
+          style={styles.stepCard}
+        >
+          <View
+            style={styles.walkIcon}
+          >
             <Ionicons
               name="walk-outline"
               size={38}
-              color={colors.primary}
+              color={
+                colors.primary
+              }
             />
           </View>
 
-          <Text style={styles.stepLabel}>
+          <Text
+            style={
+              styles.stepLabel
+            }
+          >
             오늘 걸은 걸음
           </Text>
 
-          <View style={styles.stepCountRow}>
-            <Text style={styles.stepCount}>
-              {CURRENT_STEPS.toLocaleString()}
+          <View
+            style={
+              styles.stepCountRow
+            }
+          >
+            <Text
+              style={
+                styles.stepCount
+              }
+            >
+              {currentSteps.toLocaleString()}
             </Text>
 
-            <Text style={styles.stepUnit}>
+            <Text
+              style={
+                styles.stepUnit
+              }
+            >
               보
             </Text>
           </View>
 
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>
+          <View
+            style={
+              styles.progressHeader
+            }
+          >
+            <Text
+              style={
+                styles.progressLabel
+              }
+            >
               오늘의 목표
             </Text>
 
-            <Text style={styles.targetText}>
-              {TARGET_STEPS.toLocaleString()}보
+            <Text
+              style={
+                styles.targetText
+              }
+            >
+              {targetSteps.toLocaleString()}
+              보
             </Text>
           </View>
 
-          <View style={styles.progressTrack}>
+          <View
+            style={
+              styles.progressTrack
+            }
+          >
             <View
               style={[
                 styles.progressFill,
                 {
-                  width: `${progress * 100}%`,
+                  width: `${
+                    progress * 100
+                  }%`,
                 },
               ]}
             />
           </View>
 
-          <Text style={styles.remaining}>
-            목표까지{' '}
-            <Text style={styles.remainingStrong}>
-              {remaining.toLocaleString()}보
+          {completed ? (
+            <Text
+              style={
+                styles.completedText
+              }
+            >
+              오늘의 걷기 목표를
+              완료했어요
             </Text>
-            {' '}남았어요
-          </Text>
+          ) : (
+            <Text
+              style={
+                styles.remaining
+              }
+            >
+              목표까지{' '}
+              <Text
+                style={
+                  styles.remainingStrong
+                }
+              >
+                {remaining.toLocaleString()}
+                보
+              </Text>{' '}
+              남았어요
+            </Text>
+          )}
         </View>
 
-        <View style={styles.bottomArea}>
-          <View style={styles.infoBox}>
+        <View
+          style={
+            styles.bottomArea
+          }
+        >
+          {!!errorMessage && (
+            <Text
+              style={
+                styles.errorText
+              }
+            >
+              {errorMessage}
+            </Text>
+          )}
+
+          <View
+            style={styles.infoBox}
+          >
             <Ionicons
               name="sync-outline"
               size={23}
               color="#6B7684"
             />
 
-            <Text style={styles.infoText}>
-              휴대폰의 걸음 수와 자동으로
-              동기화돼요.
+            <Text
+              style={
+                styles.infoText
+              }
+            >
+              현재는 시연용 걸음 수를
+              사용하고 있어요.
             </Text>
           </View>
 
           <TouchableOpacity
-            style={styles.refreshButton}
+            style={[
+              styles.refreshButton,
+              isSaving &&
+                styles.disabledButton,
+            ]}
             activeOpacity={0.75}
-            onPress={() => {
-              // TODO
-              // HealthKit / Health Connect 걸음 수 재조회
-              //
-              // 이후
-              // POST /api/activities/{activityId}/results
-              //
-              // {
-              //   stepCount
-              // }
-            }}
+            disabled={isSaving}
+            onPress={
+              handleRefresh
+            }
           >
-            <Ionicons
-              name="refresh"
-              size={24}
-              color={colors.primary}
-            />
+            {isSaving ? (
+              <ActivityIndicator
+                color={
+                  colors.primary
+                }
+              />
+            ) : (
+              <>
+                <Ionicons
+                  name="refresh"
+                  size={24}
+                  color={
+                    colors.primary
+                  }
+                />
 
-            <Text style={styles.refreshText}>
-              걸음 수 새로고침
-            </Text>
+                <Text
+                  style={
+                    styles.refreshText
+                  }
+                >
+                  걸음 수 새로고침
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -157,170 +443,218 @@ export default function WalkingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F7F8FA',
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        '#F7F8FA',
+    },
 
-  screen: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.page,
-    paddingTop: 12,
-    paddingBottom: 32,
-  },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  backButton: {
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-  },
+    screen: {
+      flex: 1,
+      justifyContent:
+        'space-between',
+      paddingHorizontal:
+        spacing.page,
+      paddingTop: 12,
+      paddingBottom: 32,
+    },
 
-  pageLabel: {
-    marginTop: 24,
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: colors.primary,
-  },
+    backButton: {
+      width: 48,
+      height: 48,
+      justifyContent: 'center',
+    },
 
-  title: {
-    marginTop: 10,
-    fontSize: seniorTypography.pageTitle,
-    lineHeight: 42,
-    fontFamily: fonts.bold,
-    color: '#191F28',
-  },
+    pageLabel: {
+      marginTop: 24,
+      fontSize: 18,
+      fontFamily:
+        fonts.semiBold,
+      color: colors.primary,
+    },
 
-  description: {
-    marginTop: 12,
-    fontSize: 18,
-    lineHeight: 28,
-    fontFamily: fonts.regular,
-    color: '#6B7684',
-  },
+    title: {
+      marginTop: 10,
+      fontSize:
+        seniorTypography.pageTitle,
+      lineHeight: 42,
+      fontFamily: fonts.bold,
+      color: '#191F28',
+    },
 
-  stepCard: {
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
-    padding: 26,
-  },
+    description: {
+      marginTop: 12,
+      fontSize: 18,
+      lineHeight: 28,
+      fontFamily:
+        fonts.regular,
+      color: '#6B7684',
+    },
 
-  walkIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 22,
-    backgroundColor: '#EAF5F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    stepCard: {
+      borderRadius: 28,
+      backgroundColor:
+        '#FFFFFF',
+      padding: 26,
+    },
 
-  stepLabel: {
-    marginTop: 26,
-    fontSize: 18,
-    fontFamily: fonts.regular,
-    color: '#8B95A1',
-  },
+    walkIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 22,
+      backgroundColor:
+        '#EAF5F0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  stepCountRow: {
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
+    stepLabel: {
+      marginTop: 26,
+      fontSize: 18,
+      fontFamily:
+        fonts.regular,
+      color: '#8B95A1',
+    },
 
-  stepCount: {
-    fontSize: 48,
-    lineHeight: 58,
-    fontFamily: fonts.bold,
-    color: '#191F28',
-  },
+    stepCountRow: {
+      marginTop: 4,
+      flexDirection: 'row',
+      alignItems:
+        'baseline',
+    },
 
-  stepUnit: {
-    marginLeft: 6,
-    fontSize: 22,
-    fontFamily: fonts.bold,
-    color: '#191F28',
-  },
+    stepCount: {
+      fontSize: 48,
+      lineHeight: 58,
+      fontFamily: fonts.bold,
+      color: '#191F28',
+    },
 
-  progressHeader: {
-    marginTop: 32,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
+    stepUnit: {
+      marginLeft: 6,
+      fontSize: 22,
+      fontFamily: fonts.bold,
+      color: '#191F28',
+    },
 
-  progressLabel: {
-    fontSize: 17,
-    fontFamily: fonts.medium,
-    color: '#6B7684',
-  },
+    progressHeader: {
+      marginTop: 32,
+      flexDirection: 'row',
+      justifyContent:
+        'space-between',
+    },
 
-  targetText: {
-    fontSize: 17,
-    fontFamily: fonts.semiBold,
-    color: '#191F28',
-  },
+    progressLabel: {
+      fontSize: 17,
+      fontFamily:
+        fonts.medium,
+      color: '#6B7684',
+    },
 
-  progressTrack: {
-    marginTop: 12,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#E5E8EB',
-    overflow: 'hidden',
-  },
+    targetText: {
+      fontSize: 17,
+      fontFamily:
+        fonts.semiBold,
+      color: '#191F28',
+    },
 
-  progressFill: {
-    height: '100%',
-    borderRadius: 7,
-    backgroundColor: colors.primary,
-  },
+    progressTrack: {
+      marginTop: 12,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor:
+        '#E5E8EB',
+      overflow: 'hidden',
+    },
 
-  remaining: {
-    marginTop: 14,
-    fontSize: 18,
-    lineHeight: 27,
-    fontFamily: fonts.regular,
-    color: '#6B7684',
-  },
+    progressFill: {
+      height: '100%',
+      borderRadius: 7,
+      backgroundColor:
+        colors.primary,
+    },
 
-  remainingStrong: {
-    fontFamily: fonts.bold,
-    color: colors.primary,
-  },
+    remaining: {
+      marginTop: 14,
+      fontSize: 18,
+      lineHeight: 27,
+      fontFamily:
+        fonts.regular,
+      color: '#6B7684',
+    },
 
-  bottomArea: {
-    gap: 12,
-  },
+    remainingStrong: {
+      fontFamily: fonts.bold,
+      color: colors.primary,
+    },
 
-  infoBox: {
-    padding: 18,
-    borderRadius: 18,
-    backgroundColor: '#EEF0F2',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+    completedText: {
+      marginTop: 14,
+      fontSize: 18,
+      lineHeight: 27,
+      fontFamily:
+        fonts.semiBold,
+      color: colors.primary,
+    },
 
-  infoText: {
-    flex: 1,
-    fontSize: 16,
-    lineHeight: 24,
-    fontFamily: fonts.regular,
-    color: '#6B7684',
-  },
+    bottomArea: {
+      gap: 12,
+    },
 
-  refreshButton: {
-    minHeight: 60,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
+    infoBox: {
+      padding: 18,
+      borderRadius: 18,
+      backgroundColor:
+        '#EEF0F2',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
 
-  refreshText: {
-    fontSize: 19,
-    fontFamily: fonts.bold,
-    color: colors.primary,
-  },
-});
+    infoText: {
+      flex: 1,
+      fontSize: 16,
+      lineHeight: 24,
+      fontFamily:
+        fonts.regular,
+      color: '#6B7684',
+    },
+
+    refreshButton: {
+      minHeight: 60,
+      borderRadius: 18,
+      backgroundColor:
+        '#FFFFFF',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 8,
+    },
+
+    disabledButton: {
+      opacity: 0.6,
+    },
+
+    refreshText: {
+      fontSize: 19,
+      fontFamily:
+        fonts.bold,
+      color: colors.primary,
+    },
+
+    errorText: {
+      fontSize: 16,
+      lineHeight: 24,
+      fontFamily:
+        fonts.medium,
+      color: '#F04452',
+    },
+  });

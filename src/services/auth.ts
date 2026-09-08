@@ -2,13 +2,13 @@ import axios from 'axios';
 
 import { api } from '@/services/api';
 import { saveAccessToken } from '@/services/token';
-import type {
-  ApiErrorResponse,
-  LoginRequest,
-  LoginResponse,
-  SignupRequest,
-  User,
-} from '@/types/user';
+// import type {
+//   ApiErrorResponse,
+//   LoginRequest,
+//   LoginResponse,
+//   SignupRequest,
+//   User,
+// } from '@/types/user';
 
 export async function signup(
   request: SignupRequest,
@@ -70,6 +70,6 @@ export function getApiErrorMessage(
   return fallbackMessage;
 }
 
-export async function getCurrentUser(): Promise<User | null> {
-  return null;
-}
+// export async function getCurrentUser(): Promise<User | null> {
+//   return null;
+// }

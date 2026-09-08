@@ -1,3 +1,41 @@
+import { api } from '@/services/api';
+
+import type {
+  TransferResponse,
+} from '@/types/transfer';
+
+export async function getTransfer(
+  transactionId: number,
+): Promise<TransferResponse> {
+  const response =
+    await api.get<TransferResponse>(
+      `/api/transfers/${transactionId}`,
+    );
+
+  return response.data;
+}
+
+export async function guardianApproveTransfer(
+  transactionId: number,
+): Promise<TransferResponse> {
+  const response =
+    await api.post<TransferResponse>(
+      `/api/transfers/${transactionId}/guardian-approve`,
+    );
+
+  return response.data;
+}
+
+export async function guardianRejectTransfer(
+  transactionId: number,
+): Promise<TransferResponse> {
+  const response =
+    await api.post<TransferResponse>(
+      `/api/transfers/${transactionId}/guardian-reject`,
+    );
+
+  return response.data;
+}
 import type { Transfer } from '@/types/transfer';
 import { api } from '@/services/api';
 
