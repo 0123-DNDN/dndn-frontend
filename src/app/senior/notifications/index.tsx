@@ -7,28 +7,46 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
-import { seniorTypography } from '@/constants/typography';
+import {
+  fonts,
+  seniorTypography,
+} from '@/constants/typography';
 
-const alerts = [
+const payments = [
   {
     id: 1,
-    tag: '예정',
-    title: '월세가 3일 뒤에 빠져나가요',
-    description: '9월 7일 · 650,000원',
+    name: '월세',
+    message: '3일 뒤 나가요',
+    amount: '650,000원',
+    date: '9월 7일',
+    status: 'scheduled',
   },
   {
     id: 2,
-    tag: '완료',
-    title: '통신비가 3일 전에 빠져나갔어요',
-    description: '9월 1일 · 68,500원',
+    name: '통신비',
+    message: '2일 전 나갔어요',
+    amount: '68,500원',
+    date: '9월 1일',
+    status: 'complete',
   },
   {
     id: 3,
-    tag: '가족',
-    title: '가족 소식이 도착했어요',
-    description: '오늘의 활동을 마치면 확인할 수 있어요',
+    name: '관리비',
+    message: '오늘 나가요',
+    amount: '120,000원',
+    date: '9월 5일',
+    status: 'scheduled',
+  },
+  {
+    id: 4,
+    name: '보험료',
+    message: '결제가 안됐어요',
+    amount: '42,000원',
+    date: '9월 3일',
+    status: 'failed',
   },
 ];
 
@@ -39,29 +57,64 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
+          <View style={styles.backRow}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
 
-          <Text style={styles.title}>알림</Text>
-        </View>
-
-        {alerts.map((alert) => (
-          <View key={alert.id} style={styles.card}>
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{alert.tag}</Text>
-            </View>
-
-            <Text style={styles.alertTitle}>
-              {alert.title}
-            </Text>
-
-            <Text style={styles.description}>
-              {alert.description}
+            <Text style={styles.backLabel}>
+              뒤로가기
             </Text>
           </View>
-        ))}
+
+          <Text style={styles.title}>
+            정기결제 확인
+          </Text>
+        </View>
+
+        {/* Payment Cards */}
+        <View style={styles.paymentList}>
+          {payments.map((item) => (
+            <View
+              key={item.id}
+              style={styles.paymentCard}
+            >
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentName}>
+                  {item.name}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.paymentMessage,
+                    item.status === 'complete' &&
+                      styles.completeText,
+                    item.status === 'failed' &&
+                      styles.failedText,
+                  ]}
+                >
+                  {item.message}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.amount}>
+                  {item.amount}
+                </Text>
+
+                <Text style={styles.date}>
+                  {item.date}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -79,15 +132,24 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    height: 72,
+    minHeight: 128,
+    alignItems: 'flex-start',
+    paddingTop: spacing.item,
+    marginBottom: spacing.content,
+  },
+
+  backRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
 
   backButton: {
-    minWidth: spacing.touchTarget,
+    width: 32,
     minHeight: spacing.touchTarget,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    paddingTop: 0,
+    marginRight: 0,
   },
 
   back: {
@@ -95,44 +157,82 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 
+  backLabel: {
+    marginLeft: 0,
+    fontSize: seniorTypography.body,
+    fontFamily: fonts.semiBold,
+    color: colors.text,
+  },
+
   title: {
-    fontSize: seniorTypography.pageTitle,
-    fontWeight: '800',
+    marginTop: spacing.item,
+    fontSize: 32,
+    lineHeight: 40,
+    fontFamily: fonts.bold,
     color: '#191F28',
   },
 
-  card: {
+  paymentList: {
+    gap: spacing.item,
+  },
+
+  paymentCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: spacing.cardRadius,
-    padding: spacing.content,
-    marginBottom: spacing.item,
+    paddingHorizontal: 26,
+    paddingVertical: 26,
   },
 
-  tag: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFF3BF',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  paymentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
 
-  tagText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#765C00',
-  },
-
-  alertTitle: {
-    marginTop: 14,
-    fontSize: seniorTypography.body,
-    fontWeight: '800',
+  paymentName: {
+    width: 96,
+    fontSize: 24,
+    lineHeight: 34,
+    fontFamily: fonts.bold,
     color: '#191F28',
   },
 
-  description: {
-    marginTop: 8,
-    fontSize: seniorTypography.body,
-    lineHeight: 24,
+  paymentMessage: {
+    flex: 1,
+    fontSize: 23,
+    lineHeight: 32,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  completeText: {
+    color: '#318866',
+  },
+
+  failedText: {
+    color: '#F04452',
+  },
+
+  detailRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+
+  amount: {
+    width: 96,
+    fontSize: 20,
+    lineHeight: 28,
+    fontFamily: fonts.regular,
+    color: '#8B95A1',
+  },
+
+  date: {
+    flex: 1,
+    fontSize: 20,
+    lineHeight: 28,
+    fontFamily: fonts.regular,
     color: '#8B95A1',
   },
 });
