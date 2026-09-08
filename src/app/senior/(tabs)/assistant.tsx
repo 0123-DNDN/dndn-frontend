@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Speech from 'expo-speech';
-import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -16,20 +16,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
 import { seniorTypography } from '@/constants/typography';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import {
   analyzeContext,
-  analyzeFds,
   analyzeIntent,
+  createAiSession,
+  endAiSession,
+  saveAiAssistantMessage,
+  saveAiUserMessage,
   type ContextAnalyzeResponse,
-  type FdsAnalyzeRequest,
   type FdsAnalyzeResponse,
   type FollowUpAnswer,
   type IntentAnalyzeResponse,
   type IntentHint,
 } from '@/services/ai';
+import { getMainAccount, type MainAccountResponse } from '@/services/account';
+import { searchRecipients, type Recipient } from '@/services/recipient';
+import {
+  cancelTransfer,
+  checkTransferFds,
+  completeTransfer,
+  confirmTransferAmount,
+  confirmTransferRecipient,
+  createTransfer,
+  finalConfirmTransfer,
+} from '@/services/transfer';
 
 type InputMode = 'voice' | 'chat';
 type ConversationStep = 'intent' | 'purpose' | 'follow-up' | 'result';
+type TransferPreview = { recipient: Recipient; senderAccount: MainAccountResponse };
 type Message = {
   id: number;
   role: 'assistant' | 'user';
@@ -37,6 +52,7 @@ type Message = {
   intentResult?: IntentAnalyzeResponse;
   contextResult?: ContextAnalyzeResponse;
   fdsResult?: FdsAnalyzeResponse;
+  transferPreview?: TransferPreview;
 };
 
 const TTS_OPTIONS = {
@@ -45,14 +61,9 @@ const TTS_OPTIONS = {
   pitch: 0.82,
 } as const;
 
-const MOCK_VOICE_TEXT: Record<ConversationStep, string> = {
-  intent: '아들에게 30만 원 보내줘',
-  purpose: '검찰에서 안전계좌로 보내라고 했어',
-  'follow-up': '네, 맞아요',
-  result: '다른 것도 물어볼게',
-};
-
 const TRANSFER_PURPOSE_QUESTION = '어떤 이유로 보내시는 돈인가요?';
+const PAUSE_THRESHOLD_MS = 800;
+const LONG_PAUSE_THRESHOLD_MS = 2000;
 
 export default function AssistantScreen() {
   const insets = useSafeAreaInsets();
@@ -62,13 +73,11 @@ export default function AssistantScreen() {
   const intentHint = typeof rawIntentHint === 'string' ? rawIntentHint : undefined;
 
   const [inputMode, setInputMode] = useState<InputMode | null>(null);
-  const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isResetModalVisible, setIsResetModalVisible] = useState(false);
   const [contextResult, setContextResult] = useState<ContextAnalyzeResponse | null>(null);
   const [followUpIndex, setFollowUpIndex] = useState(0);
   const [draft, setDraft] = useState('');
-  const [liveTranscript, setLiveTranscript] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [handledCardIds, setHandledCardIds] = useState<number[]>([]);
   const [handledFdsCardIds, setHandledFdsCardIds] = useState<number[]>([]);
@@ -79,7 +88,58 @@ export default function AssistantScreen() {
   const conversationStepRef = useRef<ConversationStep>('intent');
   const followUpAnswersRef = useRef<FollowUpAnswer[]>([]);
   const transferIntentRef = useRef<IntentAnalyzeResponse | null>(null);
+  const transferRecipientRef = useRef<Recipient | null>(null);
+  const transferSenderAccountRef = useRef<MainAccountResponse | null>(null);
+  const transactionIdRef = useRef<number | null>(null);
   const purposeTextRef = useRef('');
+  const shouldSubmitVoiceRef = useRef(false);
+  const sessionPromiseRef = useRef<Promise<number> | null>(null);
+  const voiceStartedAtRef = useRef<number | null>(null);
+  const lastVoiceDurationRef = useRef<number | null>(null);
+  const lastVoiceResultAtRef = useRef<number | null>(null);
+  const voicePauseDurationsRef = useRef<number[]>([]);
+  const lastAvgPauseDurationRef = useRef<number | null>(null);
+  const lastLongPauseCountRef = useRef(0);
+  const typingStartedAtRef = useRef<number | null>(null);
+  const lastTypingAtRef = useRef<number | null>(null);
+  const editCountRef = useRef(0);
+  const fullDeleteCountRef = useRef(0);
+  const typingPauseCountRef = useRef(0);
+  const lastAssistantAtRef = useRef<number | null>(null);
+  const {
+    transcript: liveTranscript,
+    finalTranscript,
+    isListening,
+    error: speechRecognitionError,
+    startListening: startSpeechRecognition,
+    stopListening: stopSpeechRecognition,
+    cancelListening,
+    resetTranscript,
+  } = useSpeechRecognition();
+
+  const startSession = () => {
+    const promise = createAiSession().then((session) => {
+      console.log('[AI session created]', session);
+      return session.sessionId;
+    });
+    sessionPromiseRef.current = promise;
+    return promise;
+  };
+
+  const ensureSession = () => sessionPromiseRef.current ?? startSession();
+
+  useFocusEffect(useCallback(() => {
+    void ensureSession().catch((error) => console.warn('[AI session create failed]', error));
+    return () => {
+      const activeSession = sessionPromiseRef.current;
+      sessionPromiseRef.current = null;
+      if (!activeSession) return;
+      void activeSession
+        .then((sessionId) => endAiSession(sessionId))
+        .then((session) => console.log('[AI session ended]', session))
+        .catch((error) => console.warn('[AI session end failed]', error));
+    };
+  }, []));
 
   const changeConversationStep = (step: ConversationStep) => {
     conversationStepRef.current = step;
@@ -128,13 +188,90 @@ export default function AssistantScreen() {
     intentResult?: IntentAnalyzeResponse,
     messageContextResult?: ContextAnalyzeResponse,
     fdsResult?: FdsAnalyzeResponse,
+    transferPreview?: TransferPreview,
   ) => {
     const id = nextMessageId.current++;
     setMessages((current) => [
       ...current,
-      { id, role, text, intentResult, contextResult: messageContextResult, fdsResult },
+      { id, role, text, intentResult, contextResult: messageContextResult, fdsResult, transferPreview },
     ]);
+    if (role === 'assistant') {
+      lastAssistantAtRef.current = Date.now();
+      void ensureSession()
+        .then((sessionId) => saveAiAssistantMessage(sessionId, text))
+        .catch((error) => console.warn('[AI assistant message save failed]', error));
+    }
     return id;
+  };
+
+  const persistUserMessage = async (
+    content: string,
+    mode: InputMode,
+    voiceDurationMs: number | null = null,
+  ) => {
+    const now = Date.now();
+    const responseDelayMs = lastAssistantAtRef.current === null
+      ? null
+      : Math.max(0, now - lastAssistantAtRef.current);
+    const isVoice = mode === 'voice';
+    const durationSeconds = voiceDurationMs && voiceDurationMs > 0
+      ? voiceDurationMs / 1000
+      : null;
+    const spokenUnits = content.replace(/\s+/g, '').length;
+
+    try {
+      const sessionId = await ensureSession();
+      const saved = await saveAiUserMessage(sessionId, {
+        inputType: isVoice ? 'VOICE' : 'CHAT',
+        content,
+        behavior: {
+          responseDelayMs,
+          typingDurationMs: isVoice || typingStartedAtRef.current === null
+            ? null
+            : Math.max(0, now - typingStartedAtRef.current),
+          editCount: isVoice ? 0 : editCountRef.current,
+          fullDeleteCount: isVoice ? 0 : fullDeleteCountRef.current,
+          typingPauseCount: isVoice ? 0 : typingPauseCountRef.current,
+          answerReversalCount: 0,
+          confusionCount: 0,
+          reexplanationCount: 0,
+        },
+        voiceCondition: isVoice
+          ? {
+              speechDurationMs: voiceDurationMs,
+              speechRate: durationSeconds ? spokenUnits / durationSeconds : null,
+              avgPauseDurationMs: lastAvgPauseDurationRef.current,
+              longPauseCount: lastLongPauseCountRef.current,
+            }
+          : null,
+      });
+      console.log('[AI user message saved]', saved);
+    } catch (error) {
+      console.warn('[AI user message save failed]', error);
+    }
+
+    typingStartedAtRef.current = null;
+    lastTypingAtRef.current = null;
+    editCountRef.current = 0;
+    fullDeleteCountRef.current = 0;
+    typingPauseCountRef.current = 0;
+    lastVoiceDurationRef.current = null;
+    lastAvgPauseDurationRef.current = null;
+    lastLongPauseCountRef.current = 0;
+  };
+
+  const handleDraftChange = (text: string) => {
+    const now = Date.now();
+    if (typingStartedAtRef.current === null && text.length > 0) {
+      typingStartedAtRef.current = now;
+    }
+    if (lastTypingAtRef.current !== null && now - lastTypingAtRef.current >= 2000) {
+      typingPauseCountRef.current += 1;
+    }
+    if (text.length < draft.length) editCountRef.current += 1;
+    if (draft.length > 0 && text.length === 0) fullDeleteCountRef.current += 1;
+    lastTypingAtRef.current = now;
+    setDraft(text);
   };
 
   const formatAiReply = (result: IntentAnalyzeResponse) => {
@@ -165,73 +302,63 @@ export default function AssistantScreen() {
     return null;
   };
 
+  const findSingleRecipient = (recipients: Recipient[], keyword: string) => {
+    const exact = recipients.filter(
+      (recipient) => recipient.aliasName === keyword || recipient.recipientName === keyword,
+    );
+    return exact.length === 1 ? exact[0] : recipients.length === 1 ? recipients[0] : null;
+  };
+
+  const getBankName = (bankCode: string) => ({
+    '004': 'KB국민은행', '011': 'NH농협은행', '020': '우리은행',
+    '081': '하나은행', '088': '신한은행',
+  })[bankCode] ?? `은행코드 ${bankCode}`;
+
+  const maskAccountNumber = (accountNumber: string) => {
+    const digits = accountNumber.replace(/\D/g, '');
+    return digits.length > 7 ? `${digits.slice(0, 3)}-***-${digits.slice(-4)}` : accountNumber;
+  };
+
   const requestFdsAnalysis = async (
     result: ContextAnalyzeResponse,
-    answers: FollowUpAnswer[],
+    _answers: FollowUpAnswer[],
   ) => {
     const transfer = transferIntentRef.current;
-    const request: FdsAnalyzeRequest = {
-      purposeText: purposeTextRef.current,
-      followUpAnswers: answers.map(({ code, answer }) => ({ code, answer })),
-      transaction: {
-        amountRatioToAverage: 1,
-        amount: transfer?.amount ?? 0,
-        balanceRatio: 0,
-        outsideUsualTime: false,
-      },
-      recipient: {
-        newRecipient: false,
-        inactiveForOneYear: false,
-        suspectedRiskAccount: false,
-        confirmedFraudAccount: false,
-      },
-      velocity: {
-        transfersIn10Minutes: 0,
-        transfersIn30Minutes: 0,
-        failedTransfersIn10Minutes: 0,
-        distinctRecipientsIn30Minutes: 0,
-        rapidCumulativeAmountIncrease: false,
-      },
-      device: {
-        newDevice: false,
-        environmentChanged: false,
-        multipleDeviceChanges: false,
-        remoteControlEnvironment: false,
-      },
-      behavior: {
-        transferCancelCount: 0,
-        amountEditCount: 0,
-        recipientChangeCount: 0,
-        sameStepReentryCount: 0,
-        backNavigationCount: 0,
-        confirmationReentryCount: 0,
-      },
-      condition: {
-        inputType: inputMode === 'voice' ? 'VOICE' : 'CHAT',
-        responseDelayRatio: 1,
-        answerReversalCount: 0,
-        confusionCount: 0,
-        reexplanationCount: 0,
-        speechRateDecreaseRatio: 0,
-        pauseIncreaseRatio: 0,
-        longPauseRepeated: false,
-        pitchChanged: false,
-        typingDurationRatio: 1,
-        textEditCount: 0,
-        fullDeleteCount: 0,
-        typingPauseCount: 0,
-      },
-    };
+    const recipient = transferRecipientRef.current;
+    if (!transfer?.amount || !recipient) {
+      throw new Error('송금 정보가 준비되지 않았습니다.');
+    }
 
-    console.log('[AI FDS request]', request);
-    const fdsResult = await analyzeFds(request);
+    const senderAccount = transferSenderAccountRef.current;
+    if (!senderAccount) throw new Error('출금계좌가 준비되지 않았습니다.');
+    const created = await createTransfer({
+      senderAccountId: senderAccount.accountId,
+      receiverAccountId: null,
+      receiverBankCode: recipient.bankCode,
+      receiverAccountNumber: recipient.accountNumber,
+      receiverName: recipient.recipientName,
+      amount: transfer.amount,
+      purpose: purposeTextRef.current,
+    });
+    console.log('[AI transfer created]', created);
+    transactionIdRef.current = created.transactionId;
+    console.log('[AI transfer recipient confirmed]', await confirmTransferRecipient(created.transactionId));
+    console.log('[AI transfer amount confirmed]', await confirmTransferAmount(created.transactionId));
+    const checked = await checkTransferFds(created.transactionId);
+    console.log('[AI transfer FDS checked]', checked);
+    const fdsResult: FdsAnalyzeResponse = {
+      ...checked.fds,
+      hardRuleTriggered: false,
+      combinationRuleTriggered: false,
+      triggeredRules: [],
+      contextAnalysisSucceeded: true,
+    };
     console.log('[AI FDS response]', fdsResult);
-    const reply =
-      fdsResult.riskLevel === 'LOW'
-        ? '최종 확인 결과, 위험도가 낮아요.'
-        : fdsResult.riskLevel === 'CAUTION'
-          ? '한 번 더 확인이 필요한 송금이에요.'
-          : '위험한 송금일 수 있어요. 지금은 송금을 멈춰 주세요.';
+    const canComplete =
+      fdsResult.riskLevel === 'LOW' && fdsResult.recommendedAction === 'PROCEED';
+    const reply = canComplete
+      ? '최종 확인 결과, 위험도가 낮아요. 송금을 진행할까요?'
+      : '보호자 확인이 필요한 송금이라 지금은 진행할 수 없어요.';
     appendMessage('assistant', reply, undefined, result, fdsResult);
     changeConversationStep('result');
     speak(reply);
@@ -243,13 +370,18 @@ export default function AssistantScreen() {
 
     Speech.stop();
     appendMessage('user', normalizedText);
+    const messageSavePromise = persistUserMessage(
+      normalizedText,
+      inputMode ?? 'chat',
+      inputMode === 'voice' ? lastVoiceDurationRef.current : null,
+    );
     setDraft('');
-    setLiveTranscript('');
-    setIsListening(false);
+    resetTranscript();
     setIsProcessing(true);
     const currentRequestVersion = ++requestVersion.current;
 
     try {
+      await messageSavePromise;
       const lastAssistantMessage = [...messages]
         .reverse()
         .find((message) => message.role === 'assistant');
@@ -324,11 +456,30 @@ export default function AssistantScreen() {
         if (currentRequestVersion !== requestVersion.current) return;
         console.log('[AI intent response]', result);
         const reply = formatAiReply(result);
-        appendMessage('assistant', reply, result);
+        if (result.intent === 'TRANSFER' && result.recipientKeyword && result.amount !== null) {
+          const [recipients, senderAccount] = await Promise.all([
+            searchRecipients(result.recipientKeyword),
+            getMainAccount(),
+          ]);
+          const recipient = findSingleRecipient(recipients, result.recipientKeyword);
+          if (!recipient) {
+            const notFound = `${result.recipientKeyword}님이 누구인지 찾지 못했어요. 등록된 받는 분을 확인해 주세요.`;
+            appendMessage('assistant', notFound);
+            speak(notFound);
+            return;
+          }
+          appendMessage('assistant', reply, result, undefined, undefined, {
+            recipient,
+            senderAccount,
+          });
+        } else {
+          appendMessage('assistant', reply, result);
+        }
         speak(reply);
       }
-    } catch {
+    } catch (error) {
       if (currentRequestVersion !== requestVersion.current) return;
+      console.warn('[AI request failed]', error);
       const errorMessage = '서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.';
       appendMessage('assistant', errorMessage);
       speak(errorMessage);
@@ -337,16 +488,67 @@ export default function AssistantScreen() {
     }
   };
 
-  const startListening = () => {
+  const startListening = async () => {
     Speech.stop();
-    setLiveTranscript('');
-    setIsListening(true);
+    shouldSubmitVoiceRef.current = false;
+    lastVoiceResultAtRef.current = null;
+    voicePauseDurationsRef.current = [];
+    lastAvgPauseDurationRef.current = null;
+    lastLongPauseCountRef.current = 0;
+    const started = await startSpeechRecognition();
+    if (started) voiceStartedAtRef.current = Date.now();
   };
 
   const finishListening = () => {
-    // STT 브랜치에서는 실시간 중간 결과로 liveTranscript를 갱신합니다.
-    submitMessage(liveTranscript || MOCK_VOICE_TEXT[conversationStepRef.current]);
+    const finishedAt = Date.now();
+    if (lastVoiceResultAtRef.current !== null) {
+      const finalGap = finishedAt - lastVoiceResultAtRef.current;
+      if (finalGap >= PAUSE_THRESHOLD_MS) {
+        voicePauseDurationsRef.current.push(finalGap);
+      }
+    }
+    const pauses = voicePauseDurationsRef.current;
+    lastAvgPauseDurationRef.current = pauses.length > 0
+      ? Math.round(pauses.reduce((sum, pause) => sum + pause, 0) / pauses.length)
+      : 0;
+    lastLongPauseCountRef.current = pauses.filter(
+      (pause) => pause >= LONG_PAUSE_THRESHOLD_MS,
+    ).length;
+    lastVoiceDurationRef.current = voiceStartedAtRef.current === null
+      ? null
+      : Math.max(0, finishedAt - voiceStartedAtRef.current);
+    voiceStartedAtRef.current = null;
+    shouldSubmitVoiceRef.current = true;
+    stopSpeechRecognition();
   };
+
+  useEffect(() => {
+    if (!isListening || !liveTranscript) return;
+
+    const now = Date.now();
+    if (lastVoiceResultAtRef.current !== null) {
+      const gap = now - lastVoiceResultAtRef.current;
+      if (gap >= PAUSE_THRESHOLD_MS) {
+        voicePauseDurationsRef.current.push(gap);
+      }
+    }
+    lastVoiceResultAtRef.current = now;
+  }, [isListening, liveTranscript]);
+
+  useEffect(() => {
+    if (!shouldSubmitVoiceRef.current || isListening) return;
+
+    shouldSubmitVoiceRef.current = false;
+    const recognizedText = (finalTranscript || liveTranscript).trim();
+    if (recognizedText) {
+      submitMessage(recognizedText);
+      return;
+    }
+
+    const reply = '말씀을 듣지 못했어요. 다시 말씀해 주세요.';
+    appendMessage('assistant', reply);
+    speak(reply);
+  }, [finalTranscript, isListening, liveTranscript]);
 
   const selectChat = () => {
     Speech.stop();
@@ -359,7 +561,7 @@ export default function AssistantScreen() {
     speak('무엇을 도와드릴까요?');
   };
 
-  const handleQuickStart = (
+  const handleQuickStart = async (
     label: string,
     hint?: IntentHint,
   ) => {
@@ -369,6 +571,7 @@ export default function AssistantScreen() {
     }
 
     appendMessage('user', label);
+    await persistUserMessage(label, 'chat');
     const reply =
       hint === 'BALANCE_CHECK'
         ? '통장 잔액 조회는 계좌와 로그인 연결 후 이용할 수 있어요.'
@@ -378,14 +581,23 @@ export default function AssistantScreen() {
   };
 
   const resetConversation = () => {
+    const previousSession = sessionPromiseRef.current;
+    sessionPromiseRef.current = null;
+    if (previousSession) {
+      void previousSession
+        .then((sessionId) => endAiSession(sessionId))
+        .catch((error) => console.warn('[AI session end failed]', error));
+    }
+    void startSession().catch((error) => console.warn('[AI session create failed]', error));
     requestVersion.current += 1;
     Speech.stop();
     setMessages([]);
     setHandledCardIds([]);
     setHandledFdsCardIds([]);
     setDraft('');
-    setLiveTranscript('');
-    setIsListening(false);
+    shouldSubmitVoiceRef.current = false;
+    cancelListening();
+    resetTranscript();
     setIsProcessing(false);
     setInputMode(null);
     changeConversationStep('intent');
@@ -393,6 +605,9 @@ export default function AssistantScreen() {
     setFollowUpIndex(0);
     followUpAnswersRef.current = [];
     transferIntentRef.current = null;
+    transferRecipientRef.current = null;
+    transferSenderAccountRef.current = null;
+    transactionIdRef.current = null;
     purposeTextRef.current = '';
     setIsResetModalVisible(false);
   };
@@ -402,15 +617,20 @@ export default function AssistantScreen() {
     setIsResetModalVisible(true);
   };
 
-  const handleTransferCard = (messageId: number, confirmed: boolean) => {
+  const handleTransferCard = async (messageId: number, confirmed: boolean) => {
     if (handledCardIds.includes(messageId)) return;
 
     setHandledCardIds((current) => [...current, messageId]);
     if (confirmed) {
-      transferIntentRef.current =
-        messages.find((message) => message.id === messageId)?.intentResult ?? null;
+      const selected = messages.find((message) => message.id === messageId);
+      if (!selected?.intentResult || !selected.transferPreview) return;
+      transferIntentRef.current = selected.intentResult;
+      transferRecipientRef.current = selected.transferPreview.recipient;
+      transferSenderAccountRef.current = selected.transferPreview.senderAccount;
     }
-    appendMessage('user', confirmed ? '맞아요' : '수정할게요');
+    const answer = confirmed ? '맞아요' : '아니요, 다시 말할게요';
+    appendMessage('user', answer);
+    await persistUserMessage(answer, 'chat');
 
     const reply = confirmed
       ? TRANSFER_PURPOSE_QUESTION
@@ -420,9 +640,9 @@ export default function AssistantScreen() {
     speak(reply);
   };
 
-  const handleFdsCard = (
+  const handleFdsCard = async (
     messageId: number,
-    action: 'continue' | 'guardian' | 'cancel',
+    action: 'continue' | 'cancel',
   ) => {
     if (handledFdsCardIds.includes(messageId)) return;
 
@@ -430,18 +650,32 @@ export default function AssistantScreen() {
 
     const userText =
       action === 'continue'
-        ? '위험을 확인했어요. 계속할게요.'
-        : action === 'guardian'
-          ? '가족에게 확인 요청할게요.'
-          : '송금을 취소할게요.';
-    const reply =
-      action === 'continue'
-        ? '아직 실제 이체 API가 연결되지 않아 송금은 실행되지 않았어요.'
-        : action === 'guardian'
-          ? '송금을 보류했어요. 가족 확인 요청 기능은 API 연결 후 전송할 수 있어요.'
-          : '알겠어요. 이번 송금은 취소했어요.';
+        ? '송금할게요.'
+        : '송금을 취소할게요.';
 
     appendMessage('user', userText);
+    await persistUserMessage(userText, 'chat');
+    const transactionId = transactionIdRef.current;
+    let reply: string;
+    try {
+      if (!transactionId) throw new Error('송금 번호가 없습니다.');
+      if (action === 'continue') {
+        const fds = messages.find((message) => message.id === messageId)?.fdsResult;
+        if (fds?.riskLevel !== 'LOW' || fds.recommendedAction !== 'PROCEED') {
+          reply = '보호자 확인 전에는 이 송금을 진행할 수 없어요.';
+        } else {
+          await finalConfirmTransfer(transactionId);
+          const completed = await completeTransfer(transactionId);
+          reply = `${completed.receiverName}님에게 ${completed.amount.toLocaleString('ko-KR')}원을 보냈어요.`;
+        }
+      } else {
+        await cancelTransfer(transactionId);
+        reply = '알겠어요. 이번 송금은 취소했어요.';
+      }
+    } catch (error) {
+      console.warn('[AI transfer action failed]', error);
+      reply = '송금을 처리하지 못했어요. 계좌 상태를 확인한 뒤 다시 시도해 주세요.';
+    }
     appendMessage('assistant', reply);
     speak(reply);
   };
@@ -581,17 +815,18 @@ export default function AssistantScreen() {
                     <Text style={styles.reasonText}>{reason}</Text>
                   </View>
                 ))}
-                {message.fdsResult.recommendedAction === 'HOLD' && (
+                {(message.fdsResult.riskLevel !== 'LOW' ||
+                  message.fdsResult.recommendedAction !== 'PROCEED') && (
                   <View style={styles.riskNotice}>
                     <Text style={styles.riskNoticeText}>
-                      송금을 보류하고 가족에게 먼저 확인해 주세요.
+                      보호자 승인 기능이 준비될 때까지 이 송금은 진행할 수 없어요.
                     </Text>
                   </View>
                 )}
                 {!handledFdsCardIds.includes(message.id) && (
                   <View style={styles.resultActions}>
-                    {message.fdsResult.riskLevel === 'LOW' ||
-                    message.fdsResult.riskLevel === 'CAUTION' ? (
+                    {message.fdsResult.riskLevel === 'LOW' &&
+                    message.fdsResult.recommendedAction === 'PROCEED' && (
                       <Pressable
                         accessibilityRole="button"
                         onPress={() => handleFdsCard(message.id, 'continue')}
@@ -601,22 +836,7 @@ export default function AssistantScreen() {
                         ]}
                       >
                         <Text style={styles.resultPrimaryButtonText}>
-                          {message.fdsResult.riskLevel === 'LOW'
-                            ? '송금 계속하기'
-                            : '확인했어요. 계속하기'}
-                        </Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => handleFdsCard(message.id, 'guardian')}
-                        style={({ pressed }) => [
-                          styles.resultPrimaryButton,
-                          pressed && styles.pressed,
-                        ]}
-                      >
-                        <Text style={styles.resultPrimaryButtonText}>
-                          가족에게 확인 요청
+                          송금하기
                         </Text>
                       </Pressable>
                     )}
@@ -683,33 +903,38 @@ export default function AssistantScreen() {
             ) : message.role === 'assistant' &&
             message.intentResult?.intent === 'TRANSFER' &&
             message.intentResult.recipientKeyword &&
-            message.intentResult.amount !== null ? (
+            message.intentResult.amount !== null &&
+            message.transferPreview ? (
               <View style={styles.transferCard}>
                 <Text style={styles.cardQuestion}>이대로 보내시겠어요?</Text>
-                <View style={styles.cardRow}>
+                <View style={styles.cardSection}>
                   <Text style={styles.cardLabel}>받는 분</Text>
-                  <Text style={styles.cardValue}>
-                    {message.intentResult.recipientKeyword}
+                  <Text style={styles.cardValue}>{message.transferPreview.recipient.recipientName}</Text>
+                  <Text style={styles.cardDetail}>
+                    {getBankName(message.transferPreview.recipient.bankCode)} ·{' '}
+                    {maskAccountNumber(message.transferPreview.recipient.accountNumber)}
                   </Text>
                 </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>금액</Text>
+                <View style={styles.cardDivider} />
+                <View style={styles.cardSection}>
+                  <Text style={styles.cardLabel}>보낼 금액</Text>
                   <Text style={styles.cardAmount}>
                     {message.intentResult.amount.toLocaleString('ko-KR')}원
                   </Text>
                 </View>
+                <View style={styles.cardDivider} />
+                <View style={styles.cardSection}>
+                  <Text style={styles.cardLabel}>출금계좌</Text>
+                  <Text style={styles.cardValue}>
+                    {message.transferPreview.senderAccount.accountName}
+                  </Text>
+                  <Text style={styles.cardDetail}>
+                    {maskAccountNumber(message.transferPreview.senderAccount.accountNumber)} · 잔액{' '}
+                    {message.transferPreview.senderAccount.balance.toLocaleString('ko-KR')}원
+                  </Text>
+                </View>
                 {!handledCardIds.includes(message.id) && (
                   <View style={styles.cardActions}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => handleTransferCard(message.id, false)}
-                      style={({ pressed }) => [
-                        styles.cardSecondaryButton,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text style={styles.cardSecondaryButtonText}>수정할게요</Text>
-                    </Pressable>
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => handleTransferCard(message.id, true)}
@@ -719,6 +944,16 @@ export default function AssistantScreen() {
                       ]}
                     >
                       <Text style={styles.cardPrimaryButtonText}>맞아요</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => handleTransferCard(message.id, false)}
+                      style={({ pressed }) => [
+                        styles.cardSecondaryButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.cardSecondaryButtonText}>아니요, 다시 말할게요</Text>
                     </Pressable>
                   </View>
                 )}
@@ -781,6 +1016,13 @@ export default function AssistantScreen() {
             <Text style={[styles.messageText, styles.userMessageText]}>
               {liveTranscript || '말씀하신 내용이 여기에 보여요'}
             </Text>
+          </View>
+        )}
+
+        {inputMode === 'voice' && speechRecognitionError && !isListening && (
+          <View style={[styles.messageBubble, styles.assistantBubble]}>
+            <Text style={styles.assistantLabel}>든든</Text>
+            <Text style={styles.processingText}>{speechRecognitionError}</Text>
           </View>
         )}
 
@@ -847,7 +1089,7 @@ export default function AssistantScreen() {
                 autoFocus
                 editable={!isProcessing}
                 multiline
-                onChangeText={setDraft}
+                onChangeText={handleDraftChange}
                 placeholder="내용을 입력해 주세요"
                 placeholderTextColor={colors.muted}
                 style={styles.chatInput}
@@ -1115,19 +1357,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 18,
   },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 18,
-    marginTop: 10,
-  },
+  cardSection: { gap: 5, paddingVertical: 3 },
+  cardDivider: { height: 1, backgroundColor: '#E8EBED', marginVertical: 16 },
   cardLabel: { color: colors.muted, fontSize: 17, fontWeight: '600' },
-  cardValue: { color: colors.text, fontSize: 20, fontWeight: '800' },
-  cardAmount: { color: colors.primary, fontSize: 24, fontWeight: '800' },
-  cardActions: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  cardValue: { color: colors.text, fontSize: 22, lineHeight: 30, fontWeight: '800' },
+  cardDetail: { color: colors.muted, fontSize: 17, lineHeight: 25, fontWeight: '600' },
+  cardAmount: { color: colors.primary, fontSize: 28, lineHeight: 36, fontWeight: '800' },
+  cardActions: { gap: 10, marginTop: 24 },
   cardSecondaryButton: {
-    flex: 1,
     minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1136,10 +1373,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: colors.white,
   },
-  cardSecondaryButtonText: { color: colors.primary, fontSize: 17, fontWeight: '800' },
+  cardSecondaryButtonText: { color: colors.primary, fontSize: 18, fontWeight: '800' },
   cardPrimaryButton: {
-    flex: 1,
-    minHeight: 54,
+    minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,

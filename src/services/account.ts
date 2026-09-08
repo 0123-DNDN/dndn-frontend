@@ -9,6 +9,8 @@ import type {
   CurrentUserResponse,
 } from '@/types/account';
 
+export type MainAccountResponse = AccountResponse;
+
 export async function getCurrentUser(): Promise<CurrentUserResponse> {
   const response =
     await api.get<CurrentUserResponse>(
@@ -42,9 +44,9 @@ export async function connectAccount(
   return response.data;
 }
 
-export async function getMainAccount(): Promise<AccountResponse> {
+export async function getMainAccount(): Promise<MainAccountResponse> {
   const response =
-    await api.get<AccountResponse>(
+    await api.get<MainAccountResponse>(
       '/api/accounts/main',
     );
 
