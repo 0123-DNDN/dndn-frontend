@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import { spacing } from '@/constants/spacing';
-import { seniorTypography } from '@/constants/typography';
+import { fonts, seniorTypography } from '@/constants/typography';
 
 export default function SeniorHomeScreen() {
   return (
@@ -77,11 +77,11 @@ export default function SeniorHomeScreen() {
           >
             <View style={styles.textArea}>
               <Text style={styles.menuTitle}>
-                알림
+                정기결제 확인
               </Text>
 
               <Text style={styles.menuDescription}>
-                정기결제와 중요한 소식을 확인해요
+                정기결제 및 자동이체를 확인해요
               </Text>
             </View>
 
@@ -107,10 +107,17 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
 
+  logo: {
+    fontSize: 22,
+    fontFamily: fonts.bold,
+    color: '#318866',
+    marginBottom: 34,
+  },
+
   greeting: {
     fontSize:
       seniorTypography.pageTitle,
-    fontWeight: '800',
+    fontFamily: fonts.bold,
     lineHeight: 42,
     letterSpacing: -0.8,
     color: '#191F28',
@@ -147,7 +154,7 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize:
       seniorTypography.sectionTitle,
-    fontWeight: '800',
+    fontFamily: fonts.bold,
     color: '#191F28',
     letterSpacing: -0.5,
   },
@@ -156,7 +163,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize:
       seniorTypography.body,
-    fontWeight: '500',
+    fontFamily: fonts.regular,
     color: '#8B95A1',
     letterSpacing: -0.2,
   },

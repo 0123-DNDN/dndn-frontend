@@ -1,67 +1,346 @@
 import { router } from 'expo-router';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
-import { seniorTypography } from '@/constants/typography';
+import {
+  fonts,
+  seniorTypography,
+} from '@/constants/typography';
 
 const transactions = [
-  ['허경민', '-500,000원', '오늘 14:20 · 송금 완료'],
-  ['김상우', '송금 취소', '오늘 11:05 · 위험 거래 확인 후 취소'],
-  ['국민연금', '+680,000원', '9월 2일 · 입금'],
+  {
+    id: 1,
+    name: '허경민',
+    description: '오늘 14:20 · 송금 완료',
+    value: '-500,000원',
+    type: 'expense',
+  },
+  {
+    id: 2,
+    name: '김상우',
+    description: '오늘 11:05 · 위험 거래 확인 후 취소',
+    value: '송금 취소',
+    type: 'cancel',
+  },
+  {
+    id: 3,
+    name: '국민연금',
+    description: '9월 2일 · 입금',
+    value: '+680,000원',
+    type: 'income',
+  },
 ];
 
 export default function AccountScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>내 통장</Text>
-          <TouchableOpacity style={styles.otherAccountButton}>
-            <Text style={styles.otherAccountText}>다른 계좌 보기</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.accountCard}>
-          <Text style={styles.accountName}>KB 국민 든든통장</Text>
-          <Text style={styles.accountNumber}>123456-01-****</Text>
-          <Text style={styles.balanceLabel}>총 잔액</Text>
-          <Text style={styles.balance}>3,450,000원</Text>
-        </View>
-        <Text style={styles.sectionTitle}>거래내역</Text>
-        {transactions.map(([name, amount, info]) => (
-          <View key={name} style={styles.transactionCard}>
-            <View style={styles.transactionTop}>
-              <Text style={styles.transactionName}>{name}</Text>
-              <Text style={styles.transactionAmount}>{amount}</Text>
-            </View>
-            <Text style={styles.transactionInfo}>{info}</Text>
+          <View style={styles.backRow}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.back}>‹</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.backLabel}>
+              뒤로가기
+            </Text>
           </View>
-        ))}
+
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>
+              내 통장
+            </Text>
+
+            <TouchableOpacity
+              style={styles.otherAccountButton}
+              activeOpacity={0.75}
+              onPress={() =>
+                router.push(
+                  '/senior/account/other-accounts',
+                )
+              }
+            >
+              <Text style={styles.otherAccountText}>
+                다른 통장 보기
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Account Card */}
+        <View style={styles.accountCard}>
+          <Text style={styles.accountName}>
+            KB 국민 든든통장
+          </Text>
+
+          <Text style={styles.accountNumber}>
+            123456-01-****
+          </Text>
+
+          <Text style={styles.balanceLabel}>
+            총 잔액
+          </Text>
+
+          <Text style={styles.balance}>
+            3,450,000원
+          </Text>
+        </View>
+
+        {/* Transactions */}
+        <Text style={styles.sectionTitle}>
+          거래내역
+        </Text>
+
+        <View style={styles.transactionList}>
+          {transactions.map((item) => (
+            <View
+              key={item.id}
+              style={styles.transactionCard}
+            >
+              <View style={styles.transactionRow}>
+                <View style={styles.transactionLeft}>
+                  <Text style={styles.transactionName}>
+                    {item.name}
+                  </Text>
+
+                  <Text
+                    style={styles.transactionDescription}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {item.description}
+                  </Text>
+                </View>
+
+                <View style={styles.transactionRight}>
+                  {item.type === 'cancel' ? (
+                    <View style={styles.cancelBadge}>
+                      <Text style={styles.cancelBadgeText}>
+                        {item.value}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.transactionValue,
+                        item.type === 'income' &&
+                          styles.incomeValue,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.value}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { paddingHorizontal: spacing.page, paddingBottom: spacing.section },
-  header: { minHeight: 64, flexDirection: 'row', alignItems: 'center' },
-  backButton: { minWidth: spacing.touchTarget, minHeight: spacing.touchTarget, justifyContent: 'center' },
-  back: { fontSize: 38, color: colors.text },
-  headerTitle: { flex: 1, fontSize: seniorTypography.pageTitle, fontWeight: '800', color: colors.text },
-  otherAccountButton: { minHeight: spacing.touchTarget, paddingHorizontal: spacing.item, borderRadius: spacing.buttonRadius, backgroundColor: colors.white, justifyContent: 'center' },
-  otherAccountText: { fontSize: 15, fontWeight: '700', color: '#4E5968' },
-  accountCard: { backgroundColor: colors.white, borderRadius: spacing.cardRadius, padding: spacing.page, marginTop: spacing.item },
-  accountName: { fontSize: 20, fontWeight: '800', color: colors.text },
-  accountNumber: { fontSize: seniorTypography.body, color: colors.muted, marginTop: 6 },
-  balanceLabel: { fontSize: seniorTypography.caption, color: colors.muted, marginTop: 26 },
-  balance: { fontSize: seniorTypography.amount, fontWeight: '900', color: colors.text, marginTop: 6 },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: spacing.section, marginBottom: spacing.item },
-  transactionCard: { backgroundColor: colors.white, borderRadius: spacing.cardRadius, padding: spacing.content, marginBottom: spacing.item },
-  transactionTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  transactionName: { fontSize: 19, fontWeight: '700', color: colors.text },
-  transactionAmount: { fontSize: 19, fontWeight: '800', color: colors.text },
-  transactionInfo: { marginTop: spacing.base * 2, fontSize: 15, color: colors.muted },
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F8FA',
+  },
+
+  content: {
+    paddingHorizontal: spacing.page,
+    paddingBottom: spacing.section,
+  },
+
+  header: {
+    paddingTop: spacing.item,
+    marginBottom: spacing.content,
+  },
+
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  backButton: {
+    width: 32,
+    minHeight: spacing.touchTarget,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+  },
+
+  back: {
+    fontSize: 38,
+    color: colors.text,
+  },
+
+  backLabel: {
+    fontSize: seniorTypography.body,
+    fontFamily: fonts.semiBold,
+    color: colors.text,
+  },
+
+  titleRow: {
+    marginTop: spacing.item,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+
+  title: {
+    flexShrink: 0,
+    fontSize: 32,
+    lineHeight: 40,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  otherAccountButton: {
+    minHeight: 60,
+    paddingHorizontal: 22,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  otherAccountText: {
+    fontSize: seniorTypography.body,
+    lineHeight: 30,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  accountCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: spacing.cardRadius,
+    padding: spacing.page,
+  },
+
+  accountName: {
+    fontSize: 26,
+    lineHeight: 36,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  accountNumber: {
+    marginTop: 8,
+    fontSize: seniorTypography.body,
+    lineHeight: 30,
+    fontFamily: fonts.regular,
+    color: '#8B95A1',
+  },
+
+  balanceLabel: {
+    marginTop: 28,
+    fontSize: seniorTypography.body,
+    lineHeight: 30,
+    fontFamily: fonts.regular,
+    color: '#8B95A1',
+  },
+
+  balance: {
+    marginTop: 8,
+    fontSize: 36,
+    lineHeight: 46,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  sectionTitle: {
+    marginTop: spacing.section,
+    marginBottom: spacing.content,
+    fontSize: 30,
+    lineHeight: 40,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  transactionList: {
+    gap: spacing.item,
+  },
+
+  transactionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: spacing.cardRadius,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+
+  transactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+
+  transactionLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  transactionName: {
+    fontSize: 22,
+    lineHeight: 30,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  transactionDescription: {
+    marginTop: 4,
+    fontSize: 17,
+    lineHeight: 24,
+    fontFamily: fonts.regular,
+    color: '#8B95A1',
+  },
+
+  transactionRight: {
+    flexShrink: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+
+  transactionValue: {
+    fontSize: 22,
+    lineHeight: 30,
+    fontFamily: fonts.bold,
+    color: '#191F28',
+  },
+
+  incomeValue: {
+    color: '#191F28',
+  },
+
+  cancelBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: '#FFF1F3',
+  },
+
+  cancelBadgeText: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: fonts.bold,
+    color: '#F04452',
+  },
 });

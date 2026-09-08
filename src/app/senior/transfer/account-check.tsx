@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { fonts, seniorTypography } from '@/constants/typography';
 
 export default function TransferAccountCheckScreen() {
   return (
@@ -67,16 +68,16 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: seniorTypography.sectionTitle,
+    fontFamily: fonts.bold,
     color: '#191F28',
   },
 
   question: {
     marginTop: 40,
-    fontSize: 32,
+    fontSize: seniorTypography.hero,
     lineHeight: 42,
-    fontWeight: '800',
+    fontFamily: fonts.bold,
     color: '#191F28',
   },
 
@@ -88,8 +89,8 @@ const styles = StyleSheet.create({
   },
 
   accountName: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: seniorTypography.bodyStrong,
+    fontFamily: fonts.semiBold,
     color: '#191F28',
   },
 
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   },
 
   secondaryButton: {
-    height: 60,
+    height: 64,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
@@ -128,13 +129,13 @@ const styles = StyleSheet.create({
   },
 
   secondaryButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: seniorTypography.button,
+    fontFamily: fonts.bold,
     color: '#4E5968',
   },
 
   primaryButton: {
-    height: 60,
+    height: 64,
     borderRadius: 16,
     backgroundColor: '#318866',
     alignItems: 'center',
@@ -142,8 +143,8 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: seniorTypography.button,
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
   },
 });

@@ -42,15 +42,18 @@ export default function AppHeader({
         },
       ]}
     >
-      <Image
-        source={require('../../../assets/images/dndn-logo.png')}
-        style={
-          isSenior
-            ? styles.seniorLogo
-            : styles.guardianLogo
-        }
-        resizeMode="contain"
-      />
+      <View style={styles.logoWrap}>
+        <Image
+          source={require('../../../assets/images/dndn-logo.png')}
+          style={
+            isSenior
+              ? styles.seniorLogo
+              : styles.guardianLogo
+          }
+          resizeMode="contain"
+          accessibilityLabel="든든 DNDN 로고"
+        />
+      </View>
 
       <TouchableOpacity
         style={
@@ -81,14 +84,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
+  logoWrap: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+
   seniorLogo: {
     width: 32,
     height: 32,
   },
 
   guardianLogo: {
-    width: 28,
-    height: 28,
+    width: 36,
+    height: 36,
   },
 
   seniorIconButton: {

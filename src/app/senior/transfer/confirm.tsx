@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { fonts, seniorTypography } from '@/constants/typography';
 
 export default function TransferConfirmScreen() {
   const { risk } = useLocalSearchParams<{ risk?: string }>();
@@ -31,12 +32,12 @@ export default function TransferConfirmScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F8FA' },
   content: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 24 },
-  title: { fontSize: 28, fontWeight: '800', color: '#191F28' },
+  title: { fontSize: seniorTypography.sectionTitle, fontFamily: fonts.bold, color: '#191F28' },
   card: { marginTop: 40, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 24 },
-  label: { marginTop: 20, fontSize: 16, color: '#8B95A1' },
-  value: { marginTop: 6, fontSize: 20, fontWeight: '800', color: '#191F28' },
-  detail: { marginTop: 4, fontSize: 16, color: '#6B7684' },
-  amount: { marginTop: 6, fontSize: 34, fontWeight: '900', color: '#191F28' },
-  primaryButton: { minHeight: 60, borderRadius: 16, backgroundColor: '#318866', alignItems: 'center', justifyContent: 'center' },
-  primaryButtonText: { fontSize: 20, fontWeight: '800', color: '#FFFFFF' },
+  label: { marginTop: 20, fontSize: seniorTypography.caption, fontFamily: fonts.regular, color: '#8B95A1' },
+  value: { marginTop: 6, fontSize: seniorTypography.bodyStrong, fontFamily: fonts.bold, color: '#191F28' },
+  detail: { marginTop: 4, fontSize: seniorTypography.caption, fontFamily: fonts.regular, color: '#6B7684' },
+  amount: { marginTop: 6, fontSize: seniorTypography.amount, fontFamily: fonts.bold, color: '#191F28' },
+  primaryButton: { minHeight: 64, borderRadius: 16, backgroundColor: '#318866', alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { fontSize: seniorTypography.button, fontFamily: fonts.bold, color: '#FFFFFF' },
 });

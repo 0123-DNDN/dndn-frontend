@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { fonts, seniorTypography } from '@/constants/typography';
 
 const reasons = [
   '처음 보내는 계좌예요',
@@ -122,22 +123,22 @@ const styles = StyleSheet.create({
 
   warningIconText: {
     fontSize: 30,
-    fontWeight: '800',
+    fontFamily: fonts.bold,
     color: '#F04452',
   },
 
   heroText: {
     marginTop: 24,
-    fontSize: 32,
+    fontSize: seniorTypography.hero,
     lineHeight: 43,
-    fontWeight: '800',
+    fontFamily: fonts.bold,
     color: '#191F28',
     letterSpacing: -0.6,
   },
 
   description: {
     marginTop: 12,
-    fontSize: 18,
+    fontSize: seniorTypography.body,
     color: '#6B7684',
   },
 
@@ -146,8 +147,8 @@ const styles = StyleSheet.create({
   },
 
   reasonTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: seniorTypography.sectionTitle,
+    fontFamily: fonts.bold,
     color: '#191F28',
     marginBottom: 16,
   },
@@ -173,7 +174,7 @@ const styles = StyleSheet.create({
 
   reasonText: {
     flex: 1,
-    fontSize: 18,
+    fontSize: seniorTypography.body,
     lineHeight: 26,
     color: '#333D4B',
   },
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   },
 
   callButton: {
-    height: 60,
+    height: 64,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
@@ -191,13 +192,13 @@ const styles = StyleSheet.create({
   },
 
   callButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: seniorTypography.button,
+    fontFamily: fonts.semiBold,
     color: '#4E5968',
   },
 
   primaryButton: {
-    height: 60,
+    height: 64,
     borderRadius: 16,
     backgroundColor: '#318866',
     alignItems: 'center',
@@ -205,8 +206,8 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: seniorTypography.button,
+    fontFamily: fonts.bold,
     color: '#FFFFFF',
   },
 
@@ -217,8 +218,8 @@ const styles = StyleSheet.create({
   },
 
   cancelButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: seniorTypography.button,
+    fontFamily: fonts.semiBold,
     color: '#F04452',
   },
 });
