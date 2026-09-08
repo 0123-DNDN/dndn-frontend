@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
-import { typography } from '@/constants/typography';
+import { seniorTypography } from '@/constants/typography';
 
 export function VoiceTransferStart() {
   return (
@@ -40,12 +40,12 @@ export function VoiceTransferStart() {
 
 const styles = StyleSheet.create({
   centerArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  heroText: { fontSize: typography.heroTitle, lineHeight: 43, fontWeight: '700', textAlign: 'center', color: colors.text },
+  heroText: { fontSize: seniorTypography.hero, lineHeight: 43, fontWeight: '700', textAlign: 'center', color: colors.text },
   suggestionGroup: { marginTop: spacing.section, gap: spacing.item, alignItems: 'center' },
   suggestion: { minHeight: spacing.touchTarget, backgroundColor: colors.white, borderRadius: spacing.buttonRadius, paddingHorizontal: spacing.content, justifyContent: 'center' },
-  suggestionText: { fontSize: typography.body, fontWeight: '600', color: '#333D4B' },
+  suggestionText: { fontSize: seniorTypography.body, fontWeight: '600', color: '#333D4B' },
   voiceInput: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 132, borderRadius: spacing.sheetRadius, backgroundColor: colors.white, padding: spacing.content, justifyContent: 'space-between' },
-  placeholder: { fontSize: typography.body, color: colors.muted },
+  placeholder: { fontSize: seniorTypography.body, color: colors.muted },
   micButton: { alignSelf: 'flex-end', width: spacing.touchTarget, height: spacing.touchTarget, borderRadius: spacing.touchTarget / 2, backgroundColor: '#F2F4F6', alignItems: 'center', justifyContent: 'center' },
   mic: { fontSize: 22 },
 });
