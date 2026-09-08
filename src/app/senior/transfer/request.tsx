@@ -20,6 +20,10 @@ export default function TransferRequestScreen() {
 
   const hasText = recognizedText.trim().length > 0;
 
+  const handleBack = () => {
+    router.replace('/senior/(tabs)/home');
+  };
+
   const handleSend = () => {
     if (!hasText) return;
 
@@ -35,7 +39,7 @@ export default function TransferRequestScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={handleBack}>
             <Text style={styles.back}>‹</Text>
           </TouchableOpacity>
 

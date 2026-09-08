@@ -15,7 +15,11 @@ import {
 } from '@/constants/typography';
 
 export default function StartScreen() {
-  const handleStart = () => {
+  const handleLogin = () => {
+    router.push('/auth/sign-in');
+  };
+
+  const handleSignup = () => {
     router.push('/auth/role');
   };
 
@@ -59,15 +63,27 @@ export default function StartScreen() {
           </SlideFadeIn>
         </View>
 
-        <TouchableOpacity
-          style={styles.startButton}
-          activeOpacity={0.85}
-          onPress={handleStart}
-        >
-          <Text style={styles.startButtonText}>
-            시작하기
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.buttonArea}>
+          <TouchableOpacity
+            style={styles.loginButton}
+            activeOpacity={0.85}
+            onPress={handleLogin}
+          >
+            <Text style={styles.loginButtonText}>
+              로그인
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.signupButton}
+            activeOpacity={0.85}
+            onPress={handleSignup}
+          >
+            <Text style={styles.signupButtonText}>
+              회원가입
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -121,7 +137,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
 
-  startButton: {
+  buttonArea: {
+    gap: 12,
+  },
+
+  loginButton: {
     height: 64,
     borderRadius: 18,
     backgroundColor: colors.primary,
@@ -129,10 +149,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  startButtonText: {
+  loginButtonText: {
     fontSize: seniorTypography.button,
     lineHeight: 28,
     fontFamily: fonts.bold,
     color: colors.white,
+  },
+
+  signupButton: {
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  signupButtonText: {
+    fontSize: seniorTypography.button,
+    lineHeight: 28,
+    fontFamily: fonts.bold,
+    color: colors.primary,
   },
 });

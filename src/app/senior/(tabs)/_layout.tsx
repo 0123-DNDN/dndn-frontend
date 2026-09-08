@@ -1,28 +1,41 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
-import { colors } from '@/constants/colors';
-import { spacing } from '@/constants/spacing';
-import { seniorTypography } from '@/constants/typography';
 
-export default function SeniorTabLayout() {
+import AppHeader from '@/components/navigation/AppHeader';
+import { colors } from '@/constants/colors';
+import {
+  fonts,
+  seniorTypography,
+} from '@/constants/typography';
+
+export default function SeniorTabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: '#B0B8C1',
 
         tabBarStyle: {
-          minHeight: spacing.touchTarget + 36,
+          height: 86,
           paddingTop: 10,
           paddingBottom: 12,
-          backgroundColor: colors.white,
-          borderTopWidth: 0,
+          backgroundColor: '#FFFFFF',
+
+          borderTopWidth: 1,
+          borderTopColor: '#F2F4F6',
+
+          elevation: 0,
+          shadowOpacity: 0,
         },
 
         tabBarLabelStyle: {
           fontSize: seniorTypography.tabLabel,
-          fontWeight: '700',
+          fontFamily: fonts.semiBold,
+          marginTop: 2,
+        },
+
+        tabBarItemStyle: {
+          paddingVertical: 2,
         },
       }}
     >
@@ -30,8 +43,25 @@ export default function SeniorTabLayout() {
         name="home"
         options={{
           title: '홈',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 24, color }}>⌂</Text>
+
+          headerShown: true,
+          header: () => (
+            <AppHeader mode="senior" />
+          ),
+
+          tabBarIcon: ({
+            color,
+            focused,
+          }) => (
+            <Ionicons
+              name={
+                focused
+                  ? 'home'
+                  : 'home-outline'
+              }
+              size={26}
+              color={color}
+            />
           ),
         }}
       />
@@ -40,8 +70,22 @@ export default function SeniorTabLayout() {
         name="assistant"
         options={{
           title: 'AI 비서',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 23, color }}>✦</Text>
+
+          headerShown: false,
+
+          tabBarIcon: ({
+            color,
+            focused,
+          }) => (
+            <Ionicons
+              name={
+                focused
+                  ? 'chatbubble-ellipses'
+                  : 'chatbubble-ellipses-outline'
+              }
+              size={27}
+              color={color}
+            />
           ),
         }}
       />
@@ -50,8 +94,25 @@ export default function SeniorTabLayout() {
         name="activity"
         options={{
           title: '활동',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 23, color }}>✓</Text>
+
+          headerShown: true,
+          header: () => (
+            <AppHeader mode="senior" />
+          ),
+
+          tabBarIcon: ({
+            color,
+            focused,
+          }) => (
+            <Ionicons
+              name={
+                focused
+                  ? 'walk'
+                  : 'walk-outline'
+              }
+              size={28}
+              color={color}
+            />
           ),
         }}
       />
@@ -60,14 +121,7 @@ export default function SeniorTabLayout() {
         name="account"
         options={{
           href: null,
-        }}
-      />
-
-      {/* 하단 탭에는 노출하지 않는 상세 화면 */}
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          href: null,
+          headerShown: false,
         }}
       />
     </Tabs>
