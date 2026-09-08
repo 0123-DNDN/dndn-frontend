@@ -1,5 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import {
+  router,
+  useFocusEffect,
+} from 'expo-router';
+import {
+  useCallback,
+  useState,
+} from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -15,14 +22,53 @@ import {
   fonts,
   seniorTypography,
 } from '@/constants/typography';
-
-const WALKING_TARGET = 3000;
-const CURRENT_STEPS = 1840;
+import {
+  getTodayActivities,
+} from '@/services/activity';
+import type {
+  TodayActivityResponse,
+} from '@/types/activity';
 
 export default function ActivityScreen() {
-  const cognitiveCompleted = false;
-  const voiceCompleted = true;
-  const walkingCompleted = false;
+  const [activities, setActivities] = useState<
+    TodayActivityResponse[]
+  >([]);
+
+  const loadActivities = useCallback(async () => {
+    try {
+      const result = await getTodayActivities();
+      setActivities(result);
+    } catch (error) {
+      console.log('ACTIVITY LOAD ERROR:', error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadActivities();
+    }, [loadActivities]),
+  );
+
+  const cognitiveActivity = activities.find(
+    (item) => item.activityType === 'COGNITIVE_GAME',
+  );
+
+  const voiceActivity = activities.find(
+    (item) => item.activityType === 'VOICE_TALK',
+  );
+
+  const walkingActivity = activities.find(
+    (item) => item.activityType === 'WALKING',
+  );
+
+  const cognitiveCompleted =
+    cognitiveActivity?.completed ?? false;
+
+  const voiceCompleted =
+    voiceActivity?.completed ?? false;
+
+  const walkingCompleted =
+    walkingActivity?.completed ?? false;
 
   const completedCount = [
     cognitiveCompleted,
@@ -32,13 +78,19 @@ export default function ActivityScreen() {
 
   const allCompleted = completedCount === 3;
 
+  const walkingTarget =
+    walkingActivity?.targetValue ?? 3000;
+
+  const currentSteps =
+    walkingActivity?.stepCount ?? 0;
+
   const walkingProgress = Math.min(
-    CURRENT_STEPS / WALKING_TARGET,
+    currentSteps / walkingTarget,
     1,
   );
 
   const remainingSteps = Math.max(
-    WALKING_TARGET - CURRENT_STEPS,
+    walkingTarget - currentSteps,
     0,
   );
 
@@ -62,10 +114,7 @@ export default function ActivityScreen() {
   const handleFamilyPhoto = () => {
     if (!allCompleted) return;
 
-    // TODO:
-    // 가족 소식 상세 화면 구현 후 연결
-    //
-    // router.push('/senior/family-news');
+    router.push('/senior/family-news');
   };
 
   return (
@@ -489,7 +538,7 @@ export default function ActivityScreen() {
               <View style={styles.stepRow}>
                 <View style={styles.currentStepArea}>
                   <Text style={styles.currentSteps}>
-                    {CURRENT_STEPS.toLocaleString()}
+                    {currentSteps.toLocaleString()}
                   </Text>
 
                   <Text style={styles.stepUnit}>
@@ -498,7 +547,7 @@ export default function ActivityScreen() {
                 </View>
 
                 <Text style={styles.targetSteps}>
-                  목표 {WALKING_TARGET.toLocaleString()}보
+                  목표 {walkingTarget.toLocaleString()}보
                 </Text>
               </View>
 

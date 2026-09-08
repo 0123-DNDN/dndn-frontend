@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import {
+  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -27,10 +28,15 @@ import {
   guardianTypography,
   seniorTypography,
 } from '@/constants/typography';
+import {
+  connectFamily,
+  createFamilyConnectionCode,
+} from '@/services/family';
+import type {
+  ConnectionCodeResponse,
+  FamilyRelationResponse,
+} from '@/types/family';
 import type { UserRole } from '@/types/user';
-
-const FAMILY_CODE = '482731';
-const SESSION_SECONDS = 10 * 60;
 
 export default function FamilyConnectScreen() {
   const params =
@@ -49,42 +55,158 @@ export default function FamilyConnectScreen() {
 }
 
 function SeniorFamilyConnect() {
-  const [remaining, setRemaining] =
-    useState(SESSION_SECONDS);
+  const [
+    connectionCode,
+    setConnectionCode,
+  ] =
+    useState<ConnectionCodeResponse | null>(
+      null,
+    );
+
+  const [
+    remaining,
+    setRemaining,
+  ] = useState(0);
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState('');
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setRemaining((prev) =>
-        prev > 0 ? prev - 1 : 0,
-      );
-    }, 1000);
-
-    return () => clearInterval(timer);
+    loadConnectionCode();
   }, []);
 
-  const time = useMemo(() => {
-    const minutes = Math.floor(
-      remaining / 60,
-    )
-      .toString()
-      .padStart(2, '0');
+  useEffect(() => {
+    if (!connectionCode) {
+      return;
+    }
 
-    const seconds = (remaining % 60)
-      .toString()
-      .padStart(2, '0');
+    const calculateRemaining = () => {
+      const expiresAt =
+        new Date(
+          connectionCode.expiresAt,
+        ).getTime();
+
+      const now =
+        new Date().getTime();
+
+      const seconds =
+        Math.max(
+          Math.floor(
+            (expiresAt - now) /
+              1000,
+          ),
+          0,
+        );
+
+      setRemaining(seconds);
+    };
+
+    calculateRemaining();
+
+    const timer =
+      setInterval(
+        calculateRemaining,
+        1000,
+      );
+
+    return () =>
+      clearInterval(timer);
+  }, [connectionCode]);
+
+  const loadConnectionCode =
+    async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+
+        const result =
+          await createFamilyConnectionCode();
+
+        setConnectionCode(
+          result,
+        );
+      } catch (error) {
+        console.log(
+          'CREATE FAMILY CODE ERROR:',
+          error,
+        );
+
+        setErrorMessage(
+          '가족 연결 코드를 만들지 못했어요.',
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+  const time = useMemo(() => {
+    const minutes =
+      Math.floor(
+        remaining / 60,
+      )
+        .toString()
+        .padStart(2, '0');
+
+    const seconds =
+      (remaining % 60)
+        .toString()
+        .padStart(2, '0');
 
     return `${minutes}:${seconds}`;
   }, [remaining]);
 
+  if (isLoading) {
+    return (
+      <SafeAreaView
+        style={styles.container}
+      >
+        <View
+          style={
+            styles.loadingContainer
+          }
+        >
+          <ActivityIndicator
+            size="large"
+            color={
+              colors.primary
+            }
+          />
+
+          <Text
+            style={
+              styles.loadingText
+            }
+          >
+            가족 연결 코드를
+            만들고 있어요
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+    <SafeAreaView
+      style={styles.container}
+    >
+      <View
+        style={styles.content}
+      >
         <View>
           <SlideFadeIn
             delay={30}
             distance={10}
           >
-            <Text style={styles.step}>
+            <Text
+              style={styles.step}
+            >
               3단계
             </Text>
           </SlideFadeIn>
@@ -93,7 +215,11 @@ function SeniorFamilyConnect() {
             delay={90}
             distance={18}
           >
-            <Text style={styles.seniorTitle}>
+            <Text
+              style={
+                styles.seniorTitle
+              }
+            >
               가족과 연결할까요?
             </Text>
           </SlideFadeIn>
@@ -103,41 +229,121 @@ function SeniorFamilyConnect() {
             distance={14}
           >
             <Text
-              style={styles.seniorSubtitle}
+              style={
+                styles.seniorSubtitle
+              }
             >
-              아래 코드를 가족에게 알려주세요.
+              아래 코드를 가족에게
+              알려주세요.
               {`\n`}
-              가족이 코드를 입력하면 연결돼요.
+              가족이 코드를 입력하면
+              연결돼요.
             </Text>
           </SlideFadeIn>
 
-          <SlideFadeIn
-            delay={240}
-            duration={460}
-            distance={16}
-          >
-            <View style={styles.codeCard}>
-              <Text style={styles.code}>
-                {FAMILY_CODE}
+          {connectionCode ? (
+            <SlideFadeIn
+              delay={240}
+              duration={460}
+              distance={16}
+            >
+              <View
+                style={
+                  styles.codeCard
+                }
+              >
+                <Text
+                  style={
+                    styles.code
+                  }
+                >
+                  {
+                    connectionCode.code
+                  }
+                </Text>
+
+                <Text
+                  style={
+                    styles.timer
+                  }
+                >
+                  남은 시간 {time}
+                </Text>
+              </View>
+            </SlideFadeIn>
+          ) : (
+            <View
+              style={
+                styles.codeErrorCard
+              }
+            >
+              <Text
+                style={
+                  styles.errorText
+                }
+              >
+                {errorMessage ||
+                  '가족 연결 코드를 불러오지 못했어요.'}
               </Text>
 
-              <Text style={styles.timer}>
-                남은 시간 {time}
-              </Text>
+              <TouchableOpacity
+                style={
+                  styles.retryButton
+                }
+                onPress={
+                  loadConnectionCode
+                }
+              >
+                <Text
+                  style={
+                    styles.retryButtonText
+                  }
+                >
+                  다시 만들기
+                </Text>
+              </TouchableOpacity>
             </View>
-          </SlideFadeIn>
+          )}
+
+          {!!connectionCode &&
+            remaining === 0 && (
+              <TouchableOpacity
+                style={
+                  styles.newCodeButton
+                }
+                onPress={
+                  loadConnectionCode
+                }
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={
+                    styles.newCodeText
+                  }
+                >
+                  새 연결 코드 만들기
+                </Text>
+              </TouchableOpacity>
+            )}
 
           <SlideFadeIn
             delay={310}
             distance={10}
           >
-            <Text style={styles.helper}>
-              연결 코드는 10분 동안 사용할 수 있어요.
+            <Text
+              style={
+                styles.helper
+              }
+            >
+              연결 코드는 정해진 시간
+              동안 사용할 수 있어요.
             </Text>
           </SlideFadeIn>
         </View>
 
-        <View style={styles.footer}>
+        <View
+          style={styles.footer}
+        >
           <TouchableOpacity
             style={
               styles.seniorPrimaryButton
@@ -159,7 +365,9 @@ function SeniorFamilyConnect() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.skipButton}
+            style={
+              styles.skipButton
+            }
             activeOpacity={0.7}
             onPress={() =>
               router.replace(
@@ -167,7 +375,11 @@ function SeniorFamilyConnect() {
               )
             }
           >
-            <Text style={styles.skipText}>
+            <Text
+              style={
+                styles.skipText
+              }
+            >
               가족 연결은 나중에 하기
             </Text>
           </TouchableOpacity>
@@ -178,37 +390,87 @@ function SeniorFamilyConnect() {
 }
 
 function GuardianFamilyConnect() {
-  const [code, setCode] = useState('');
-  const [connected, setConnected] =
-    useState(false);
+  const [code, setCode] =
+    useState('');
 
-  const valid = code.length === 6;
+  const [
+    relation,
+    setRelation,
+  ] =
+    useState<FamilyRelationResponse | null>(
+      null,
+    );
+
+  const [
+    isConnecting,
+    setIsConnecting,
+  ] = useState(false);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState('');
+
+  const valid =
+    /^\d{6}$/.test(code);
 
   const handleCodeChange = (
     value: string,
   ) => {
-    const numbersOnly = value
-      .replace(/\D/g, '')
-      .slice(0, 6);
+    const numbersOnly =
+      value
+        .replace(/\D/g, '')
+        .slice(0, 6);
 
     setCode(numbersOnly);
+    setErrorMessage('');
 
-    if (numbersOnly.length === 6) {
+    if (
+      numbersOnly.length === 6
+    ) {
       Keyboard.dismiss();
     }
   };
 
-  const handleConnect = () => {
-    if (!valid) return;
+  const handleConnect =
+    async () => {
+      if (
+        !valid ||
+        isConnecting
+      ) {
+        return;
+      }
 
-    Keyboard.dismiss();
+      try {
+        Keyboard.dismiss();
+        setIsConnecting(true);
+        setErrorMessage('');
 
-    setConnected(true);
-  };
+        const result =
+          await connectFamily({
+            code,
+          });
 
-  if (connected) {
+        setRelation(result);
+      } catch (error) {
+        console.log(
+          'CONNECT FAMILY ERROR:',
+          error,
+        );
+
+        setErrorMessage(
+          '가족 연결에 실패했어요. 연결 코드를 다시 확인해 주세요.',
+        );
+      } finally {
+        setIsConnecting(false);
+      }
+    };
+
+  if (relation) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView
+        style={styles.container}
+      >
         <View
           style={
             styles.guardianConnectedContent
@@ -220,10 +482,14 @@ function GuardianFamilyConnect() {
               distance={14}
             >
               <View
-                style={styles.successBadge}
+                style={
+                  styles.successBadge
+                }
               >
                 <Text
-                  style={styles.successMark}
+                  style={
+                    styles.successMark
+                  }
                 >
                   ✓
                 </Text>
@@ -235,7 +501,9 @@ function GuardianFamilyConnect() {
               distance={18}
             >
               <Text
-                style={styles.guardianTitle}
+                style={
+                  styles.guardianTitle
+                }
               >
                 가족 연결이 완료됐어요
               </Text>
@@ -250,8 +518,9 @@ function GuardianFamilyConnect() {
                   styles.guardianSubtitle
                 }
               >
-                이제 가족의 안전한 금융 생활을
-                함께 확인할 수 있어요.
+                이제 가족의 안전한 금융
+                생활을 함께 확인할 수
+                있어요.
               </Text>
             </SlideFadeIn>
 
@@ -264,13 +533,26 @@ function GuardianFamilyConnect() {
                   styles.relationshipCard
                 }
               >
-                <Text
-                  style={
-                    styles.relationshipName
-                  }
-                >
-                  김영희
-                </Text>
+                <View>
+                  <Text
+                    style={
+                      styles.relationshipLabel
+                    }
+                  >
+                    시니어
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.relationshipName
+                    }
+                  >
+                    사용자 #
+                    {
+                      relation.seniorUserId
+                    }
+                  </Text>
+                </View>
 
                 <Text
                   style={
@@ -280,14 +562,36 @@ function GuardianFamilyConnect() {
                   ↔
                 </Text>
 
-                <Text
-                  style={
-                    styles.relationshipName
-                  }
-                >
-                  허경민
-                </Text>
+                <View>
+                  <Text
+                    style={
+                      styles.relationshipLabel
+                    }
+                  >
+                    보호자
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.relationshipName
+                    }
+                  >
+                    사용자 #
+                    {
+                      relation.guardianUserId
+                    }
+                  </Text>
+                </View>
               </View>
+
+              <Text
+                style={
+                  styles.relationStatus
+                }
+              >
+                연결 상태:{' '}
+                {relation.status}
+              </Text>
             </SlideFadeIn>
           </View>
 
@@ -316,26 +620,35 @@ function GuardianFamilyConnect() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+    >
       <TouchableWithoutFeedback
-        onPress={Keyboard.dismiss}
+        onPress={
+          Keyboard.dismiss
+        }
         accessible={false}
       >
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={
-            Platform.OS === 'ios'
+            Platform.OS ===
+            'ios'
               ? 'padding'
               : undefined
           }
         >
-          <View style={styles.content}>
+          <View
+            style={styles.content}
+          >
             <View>
               <SlideFadeIn
                 delay={30}
                 distance={10}
               >
-                <Text style={styles.step}>
+                <Text
+                  style={styles.step}
+                >
                   3단계
                 </Text>
               </SlideFadeIn>
@@ -345,9 +658,12 @@ function GuardianFamilyConnect() {
                 distance={18}
               >
                 <Text
-                  style={styles.guardianTitle}
+                  style={
+                    styles.guardianTitle
+                  }
                 >
-                  가족 연결 코드를{`\n`}
+                  가족 연결 코드를
+                  {`\n`}
                   입력해 주세요
                 </Text>
               </SlideFadeIn>
@@ -361,8 +677,9 @@ function GuardianFamilyConnect() {
                     styles.guardianSubtitle
                   }
                 >
-                  시니어 화면에 표시된 6자리 코드를
-                  입력해 주세요.
+                  시니어 화면에 표시된
+                  6자리 코드를 입력해
+                  주세요.
                 </Text>
               </SlideFadeIn>
 
@@ -384,32 +701,52 @@ function GuardianFamilyConnect() {
                   keyboardType="number-pad"
                   maxLength={6}
                   autoFocus
+                  editable={
+                    !isConnecting
+                  }
                 />
               </SlideFadeIn>
 
-              <Text style={styles.mockHint}>
-                시연용 연결 코드:{' '}
-                {FAMILY_CODE}
-              </Text>
+              {!!errorMessage && (
+                <Text
+                  style={
+                    styles.guardianErrorText
+                  }
+                >
+                  {errorMessage}
+                </Text>
+              )}
             </View>
 
             <TouchableOpacity
               style={[
                 styles.guardianPrimaryButton,
-                !valid &&
+                (!valid ||
+                  isConnecting) &&
                   styles.disabledButton,
               ]}
-              disabled={!valid}
-              onPress={handleConnect}
+              disabled={
+                !valid ||
+                isConnecting
+              }
+              onPress={
+                handleConnect
+              }
               activeOpacity={0.85}
             >
-              <Text
-                style={
-                  styles.guardianPrimaryText
-                }
-              >
-                가족 연결하기
-              </Text>
+              {isConnecting ? (
+                <ActivityIndicator
+                  color="#FFFFFF"
+                />
+              ) : (
+                <Text
+                  style={
+                    styles.guardianPrimaryText
+                  }
+                >
+                  가족 연결하기
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -418,205 +755,317 @@ function GuardianFamilyConnect() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        colors.background,
+    },
 
-  flex: {
-    flex: 1,
-  },
+    flex: {
+      flex: 1,
+    },
 
-  content: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 56,
-    paddingBottom: 24,
-  },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
 
-  step: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: colors.primary,
-    marginBottom: 16,
-  },
+    loadingText: {
+      marginTop: 16,
+      fontSize:
+        seniorTypography.body,
+      lineHeight: 30,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+      textAlign: 'center',
+    },
 
-  seniorTitle: {
-    fontSize: seniorTypography.pageTitle,
-    lineHeight: 42,
-    fontFamily: fonts.bold,
-    color: colors.text,
-  },
+    content: {
+      flex: 1,
+      justifyContent:
+        'space-between',
+      paddingHorizontal: 24,
+      paddingTop: 56,
+      paddingBottom: 24,
+    },
 
-  seniorSubtitle: {
-    marginTop: 12,
-    fontSize: seniorTypography.body,
-    lineHeight: 30,
-    fontFamily: fonts.regular,
-    color: colors.muted,
-  },
+    step: {
+      fontSize: 16,
+      fontFamily:
+        fonts.semiBold,
+      color: colors.primary,
+      marginBottom: 16,
+    },
 
-  codeCard: {
-    marginTop: 40,
-    paddingVertical: 32,
-    borderRadius: 22,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-  },
+    seniorTitle: {
+      fontSize:
+        seniorTypography.pageTitle,
+      lineHeight: 42,
+      fontFamily: fonts.bold,
+      color: colors.text,
+    },
 
-  code: {
-    fontSize: 42,
-    letterSpacing: 9,
-    fontFamily: fonts.bold,
-    color: colors.text,
-  },
+    seniorSubtitle: {
+      marginTop: 12,
+      fontSize:
+        seniorTypography.body,
+      lineHeight: 30,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+    },
 
-  timer: {
-    marginTop: 16,
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: colors.primary,
-  },
+    codeCard: {
+      marginTop: 40,
+      paddingVertical: 32,
+      borderRadius: 22,
+      backgroundColor:
+        colors.white,
+      alignItems: 'center',
+    },
 
-  helper: {
-    marginTop: 14,
-    fontSize: 18,
-    lineHeight: 26,
-    fontFamily: fonts.regular,
-    textAlign: 'center',
-    color: colors.muted,
-  },
+    code: {
+      fontSize: 42,
+      letterSpacing: 9,
+      fontFamily: fonts.bold,
+      color: colors.text,
+    },
 
-  footer: {
-    gap: 10,
-  },
+    timer: {
+      marginTop: 16,
+      fontSize: 18,
+      fontFamily:
+        fonts.semiBold,
+      color: colors.primary,
+    },
 
-  seniorPrimaryButton: {
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    helper: {
+      marginTop: 14,
+      fontSize: 18,
+      lineHeight: 26,
+      fontFamily:
+        fonts.regular,
+      textAlign: 'center',
+      color: colors.muted,
+    },
 
-  seniorPrimaryText: {
-    fontSize: seniorTypography.button,
-    fontFamily: fonts.bold,
-    color: colors.white,
-  },
+    footer: {
+      gap: 10,
+    },
 
-  skipButton: {
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    seniorPrimaryButton: {
+      height: 64,
+      borderRadius: 18,
+      backgroundColor:
+        colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  skipText: {
-    fontSize: 18,
-    fontFamily: fonts.semiBold,
-    color: '#6B7684',
-  },
+    seniorPrimaryText: {
+      fontSize:
+        seniorTypography.button,
+      fontFamily: fonts.bold,
+      color: colors.white,
+    },
 
-  guardianTitle: {
-    fontSize: guardianTypography.pageTitle,
-    lineHeight: 38,
-    fontFamily: fonts.bold,
-    color: colors.text,
-  },
+    skipButton: {
+      height: 54,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  guardianSubtitle: {
-    marginTop: 12,
-    fontSize: guardianTypography.body,
-    lineHeight: 26,
-    fontFamily: fonts.regular,
-    color: colors.muted,
-  },
+    skipText: {
+      fontSize: 18,
+      fontFamily:
+        fonts.semiBold,
+      color: '#6B7684',
+    },
 
-  guardianCodeInput: {
-    marginTop: 36,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: colors.white,
-    paddingHorizontal: 20,
-    fontSize: 24,
-    fontFamily: fonts.semiBold,
-    letterSpacing: 8,
-    textAlign: 'center',
-    color: colors.text,
-  },
+    codeErrorCard: {
+      marginTop: 40,
+      padding: 24,
+      borderRadius: 22,
+      backgroundColor:
+        '#FFFFFF',
+    },
 
-  mockHint: {
-    marginTop: 10,
-    fontSize: 14,
-    fontFamily: fonts.regular,
-    color: colors.muted,
-    textAlign: 'center',
-  },
+    errorText: {
+      fontSize: 17,
+      lineHeight: 26,
+      fontFamily:
+        fonts.medium,
+      color: '#F04452',
+      textAlign: 'center',
+    },
 
-  guardianPrimaryButton: {
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    retryButton: {
+      marginTop: 18,
+      height: 54,
+      borderRadius: 16,
+      backgroundColor:
+        colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  guardianPrimaryText: {
-    fontSize: guardianTypography.button,
-    fontFamily: fonts.bold,
-    color: colors.white,
-  },
+    retryButtonText: {
+      fontSize: 18,
+      fontFamily: fonts.bold,
+      color: '#FFFFFF',
+    },
 
-  disabledButton: {
-    backgroundColor: '#D1D6DB',
-  },
+    newCodeButton: {
+      marginTop: 16,
+      minHeight: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  guardianConnectedContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 100,
-    paddingBottom: 24,
-  },
+    newCodeText: {
+      fontSize: 18,
+      fontFamily:
+        fonts.semiBold,
+      color: colors.primary,
+    },
 
-  successBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#EAF5F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-  },
+    guardianTitle: {
+      fontSize:
+        guardianTypography.pageTitle,
+      lineHeight: 38,
+      fontFamily: fonts.bold,
+      color: colors.text,
+    },
 
-  successMark: {
-    fontSize: 28,
-    fontFamily: fonts.bold,
-    color: colors.primary,
-  },
+    guardianSubtitle: {
+      marginTop: 12,
+      fontSize:
+        guardianTypography.body,
+      lineHeight: 26,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+    },
 
-  relationshipCard: {
-    marginTop: 36,
-    padding: 22,
-    borderRadius: 20,
-    backgroundColor: colors.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 18,
-  },
+    guardianCodeInput: {
+      marginTop: 36,
+      height: 64,
+      borderRadius: 16,
+      backgroundColor:
+        colors.white,
+      paddingHorizontal: 20,
+      fontSize: 24,
+      fontFamily:
+        fonts.semiBold,
+      letterSpacing: 8,
+      textAlign: 'center',
+      color: colors.text,
+    },
 
-  relationshipName: {
-    fontSize: 20,
-    fontFamily: fonts.bold,
-    color: colors.text,
-  },
+    guardianErrorText: {
+      marginTop: 12,
+      fontSize: 15,
+      lineHeight: 22,
+      fontFamily:
+        fonts.medium,
+      color: '#F04452',
+      textAlign: 'center',
+    },
 
-  relationshipArrow: {
-    fontSize: 20,
-    fontFamily: fonts.regular,
-    color: colors.muted,
-  },
-});
+    guardianPrimaryButton: {
+      height: 56,
+      borderRadius: 16,
+      backgroundColor:
+        colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    guardianPrimaryText: {
+      fontSize:
+        guardianTypography.button,
+      fontFamily: fonts.bold,
+      color: colors.white,
+    },
+
+    disabledButton: {
+      backgroundColor:
+        '#D1D6DB',
+    },
+
+    guardianConnectedContent: {
+      flex: 1,
+      justifyContent:
+        'space-between',
+      paddingHorizontal: 24,
+      paddingTop: 100,
+      paddingBottom: 24,
+    },
+
+    successBadge: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor:
+        '#EAF5F0',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 28,
+    },
+
+    successMark: {
+      fontSize: 28,
+      fontFamily: fonts.bold,
+      color: colors.primary,
+    },
+
+    relationshipCard: {
+      marginTop: 36,
+      padding: 22,
+      borderRadius: 20,
+      backgroundColor:
+        colors.white,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 18,
+    },
+
+    relationshipLabel: {
+      fontSize: 13,
+      lineHeight: 18,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+      textAlign: 'center',
+    },
+
+    relationshipName: {
+      marginTop: 4,
+      fontSize: 18,
+      fontFamily: fonts.bold,
+      color: colors.text,
+      textAlign: 'center',
+    },
+
+    relationshipArrow: {
+      fontSize: 20,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+    },
+
+    relationStatus: {
+      marginTop: 12,
+      fontSize: 14,
+      fontFamily:
+        fonts.regular,
+      color: colors.muted,
+      textAlign: 'center',
+    },
+  });

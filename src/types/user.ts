@@ -1,12 +1,10 @@
-export type UserRole = 'senior' | 'guardian';
+export type UserRole =
+  | 'senior'
+  | 'guardian';
 
-export type ApiUserRole = 'SENIOR' | 'GUARDIAN';
-
-export type User = {
-  id: string;
-  name: string;
-  role: UserRole;
-};
+export type ApiUserRole =
+  | 'SENIOR'
+  | 'GUARDIAN';
 
 export type SignupRequest = {
   name: string;
@@ -28,7 +26,16 @@ export type LoginResponse = {
   role: ApiUserRole;
 };
 
+export type UserProfileResponse = {
+  userId: number;
+  name: string;
+  role: ApiUserRole;
+  phone: string;
+  birthDate: string;
+};
+
 export type ApiErrorResponse = {
-  status: number;
-  message: string;
+  message?: string;
+  error?: string;
+  status?: number;
 };
