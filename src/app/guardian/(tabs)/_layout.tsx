@@ -1,14 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 import AppHeader from '@/components/navigation/AppHeader';
 import { colors } from '@/constants/colors';
+import { getUnreadNotificationCount } from '@/services/notification';
 import {
   fonts,
   guardianTypography,
 } from '@/constants/typography';
 
 export default function GuardianTabsLayout() {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      getUnreadNotificationCount()
+        .then(setUnreadCount)
+        .catch((error) => console.warn('UNREAD COUNT ERROR:', error));
+    }, []),
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -76,6 +89,7 @@ export default function GuardianTabsLayout() {
         name="alerts"
         options={{
           title: '알림',
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
 
           tabBarIcon: ({
             color,

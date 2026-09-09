@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -10,6 +11,8 @@ import {
 
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
+import { getNotifications, markNotificationAsRead } from '@/services/notification';
+import type { Notification } from '@/types/notification';
 import {
   fonts,
   seniorTypography,
@@ -51,6 +54,35 @@ const payments = [
 ];
 
 export default function NotificationsScreen() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    getNotifications()
+      .then(setNotifications)
+      .catch((error) => console.warn('SENIOR NOTIFICATIONS ERROR:', error));
+  }, []);
+
+  const handleNotificationPress = async (notification: Notification) => {
+    if (!notification.isRead) {
+      try {
+        await markNotificationAsRead(notification.notificationId);
+        setNotifications((current) =>
+          current.map((item) =>
+            item.notificationId === notification.notificationId
+              ? { ...item, isRead: true }
+              : item,
+          ),
+        );
+      } catch (error) {
+        console.warn('SENIOR ALERT READ ERROR:', error);
+      }
+    }
+
+    if (notification.type === 'FAMILY_POST_RECEIVED') {
+      router.push('/senior/family-news');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -78,41 +110,31 @@ export default function NotificationsScreen() {
           </Text>
         </View>
 
-        {/* Payment Cards */}
+        {/* Notification Cards */}
         <View style={styles.paymentList}>
-          {payments.map((item) => (
-            <View
-              key={item.id}
-              style={styles.paymentCard}
+          {notifications.map((notification) => (
+            <TouchableOpacity
+              key={notification.notificationId}
+              style={[styles.paymentCard, notification.isRead && styles.readCard]}
+              onPress={() => handleNotificationPress(notification)}
             >
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentName}>
-                  {item.name}
+                  {notification.title}
                 </Text>
-
-                <Text
-                  style={[
-                    styles.paymentMessage,
-                    item.status === 'complete' &&
-                      styles.completeText,
-                    item.status === 'failed' &&
-                      styles.failedText,
-                  ]}
-                >
-                  {item.message}
+                <Text style={styles.paymentMessage}>
+                  {notification.isRead ? '확인함' : '새 알림'}
                 </Text>
               </View>
-
               <View style={styles.detailRow}>
                 <Text style={styles.amount}>
-                  {item.amount}
+                  {notification.content}
                 </Text>
-
                 <Text style={styles.date}>
-                  {item.date}
+                  {new Date(notification.createdAt).toLocaleDateString('ko-KR')}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
@@ -181,6 +203,10 @@ const styles = StyleSheet.create({
     borderRadius: spacing.cardRadius,
     paddingHorizontal: 26,
     paddingVertical: 26,
+  },
+
+  readCard: {
+    opacity: 0.65,
   },
 
   paymentRow: {

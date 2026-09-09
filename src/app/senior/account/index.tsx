@@ -487,7 +487,7 @@ export default function AccountScreen() {
                         }
                         onPress={() =>
                           router.push(
-                            `/senior/transaction/${item.transactionId}`,
+                            '/senior/account',
                           )
                         }
                       >
