@@ -7,6 +7,38 @@ import type {
   TodayActivityResponse,
 } from '@/types/activity';
 
+export type VoiceTalkStartResponse = {
+  sessionId: number;
+  question: string;
+  totalQuestions: number;
+};
+
+export type VoiceTalkAnswerResponse = {
+  sessionId: number;
+  nextQuestion: string | null;
+  summary: string | null;
+  answeredCount: number;
+  completed: boolean;
+};
+
+export async function startVoiceTalkSession(): Promise<VoiceTalkStartResponse> {
+  const response = await api.post<VoiceTalkStartResponse>(
+    '/api/activities/voice-talk/sessions',
+  );
+  return response.data;
+}
+
+export async function submitVoiceTalkAnswer(
+  sessionId: number,
+  text: string,
+): Promise<VoiceTalkAnswerResponse> {
+  const response = await api.post<VoiceTalkAnswerResponse>(
+    `/api/activities/voice-talk/sessions/${sessionId}/answers`,
+    { text },
+  );
+  return response.data;
+}
+
 export async function getTodayActivities(): Promise<
   TodayActivityResponse[]
 > {

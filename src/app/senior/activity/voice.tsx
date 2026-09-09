@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as Speech from 'expo-speech';
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -21,18 +23,13 @@ import {
 } from '@/constants/typography';
 import {
   getTodayActivityByType,
-  saveActivityResult,
+  startVoiceTalkSession,
+  submitVoiceTalkAnswer,
 } from '@/services/activity';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import type {
   TodayActivityResponse,
 } from '@/types/activity';
-
-const questions = [
-  '오늘 기분은 어떠셨어요?',
-  '오늘 가장 기억에 남는 일이 있었나요?',
-  '오늘 맛있게 드신 음식이 있었나요?',
-  '내일은 무엇을 하고 싶으세요?',
-];
 
 export default function VoiceTalkScreen() {
   const [
@@ -48,13 +45,23 @@ export default function VoiceTalkScreen() {
     setStarted,
   ] = useState(false);
 
-  const [turn, setTurn] =
-    useState(0);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const [question, setQuestion] = useState('');
+  const [answeredCount, setAnsweredCount] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(4);
+  const [summary, setSummary] = useState<string | null>(null);
+  const shouldSubmitRef = useRef(false);
 
-  const [
-    listening,
-    setListening,
-  ] = useState(false);
+  const {
+    transcript,
+    finalTranscript,
+    isListening: listening,
+    error: speechError,
+    startListening,
+    stopListening,
+    cancelListening,
+    resetTranscript,
+  } = useSpeechRecognition();
 
   const [
     finished,
@@ -78,7 +85,19 @@ export default function VoiceTalkScreen() {
 
   useEffect(() => {
     loadActivity();
+    return () => {
+      Speech.stop();
+      cancelListening();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!shouldSubmitRef.current || listening) return;
+    const text = (finalTranscript || transcript).trim();
+    if (!text) return;
+    shouldSubmitRef.current = false;
+    void submitAnswer(text);
+  }, [finalTranscript, listening, transcript]);
 
   const loadActivity =
     async () => {
@@ -109,53 +128,67 @@ export default function VoiceTalkScreen() {
       }
     };
 
-  const completeActivity =
-    async () => {
-      if (!activity) {
-        setErrorMessage(
-          '활동 정보를 찾을 수 없어요.',
-        );
+  const speakAndListen = (text: string) => {
+    cancelListening();
+    Speech.stop();
+    Speech.speak(text, {
+      language: 'ko-KR',
+      rate: 0.85,
+      onDone: () => void startListening(),
+      onStopped: () => undefined,
+      onError: () => setErrorMessage('질문을 읽어드리지 못했어요.'),
+    });
+  };
 
+  const startConversation = async () => {
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      resetTranscript();
+      const response = await startVoiceTalkSession();
+      setSessionId(response.sessionId);
+      setQuestion(response.question);
+      setTotalQuestions(response.totalQuestions);
+      setAnsweredCount(0);
+      setStarted(true);
+      speakAndListen(response.question);
+    } catch (error) {
+      console.log('VOICE TALK START ERROR:', error);
+      setErrorMessage('오늘 이야기를 시작하지 못했어요.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const submitAnswer = async (text: string) => {
+    if (sessionId === null) return;
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      const response = await submitVoiceTalkAnswer(sessionId, text);
+      setAnsweredCount(response.answeredCount);
+      resetTranscript();
+
+      if (response.completed) {
+        const finalSummary = response.summary ?? '오늘 이야기 들려주셔서 고마워요.';
+        setSummary(finalSummary);
+        setFinished(true);
+        Speech.stop();
+        Speech.speak(finalSummary, { language: 'ko-KR', rate: 0.85 });
         return;
       }
 
-      try {
-        setIsSaving(true);
-        setErrorMessage('');
-
-        /*
-         * 현재는 InteractionSession 연결 전.
-         * sessionId 없이 COMPLETED만 저장.
-         *
-         * 추후 실제 대화 세션이 생기면:
-         *
-         * {
-         *   sessionId,
-         *   status: 'COMPLETED'
-         * }
-         */
-        await saveActivityResult(
-          activity.activityId,
-          {
-            status:
-              'COMPLETED',
-          },
-        );
-
-        setFinished(true);
-      } catch (error) {
-        console.log(
-          'VOICE ACTIVITY SAVE ERROR:',
-          error,
-        );
-
-        setErrorMessage(
-          '활동 결과를 저장하지 못했어요.',
-        );
-      } finally {
-        setIsSaving(false);
+      if (response.nextQuestion) {
+        setQuestion(response.nextQuestion);
+        speakAndListen(response.nextQuestion);
       }
-    };
+    } catch (error) {
+      console.log('VOICE TALK ANSWER ERROR:', error);
+      setErrorMessage('답변을 저장하지 못했어요. 다시 말씀해 주세요.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleMic =
     async () => {
@@ -164,34 +197,18 @@ export default function VoiceTalkScreen() {
       }
 
       if (!started) {
-        setStarted(true);
-        setListening(true);
-
+        await startConversation();
         return;
       }
 
       if (listening) {
-        setListening(false);
-
-        if (
-          turn ===
-          questions.length - 1
-        ) {
-          await completeActivity();
-
-          return;
-        }
-
-        setTimeout(() => {
-          setTurn(
-            (prev) => prev + 1,
-          );
-        }, 400);
-
+        shouldSubmitRef.current = true;
+        stopListening();
         return;
       }
 
-      setListening(true);
+      resetTranscript();
+      await startListening();
     };
 
   if (isLoading) {
@@ -253,8 +270,7 @@ export default function VoiceTalkScreen() {
               styles.completeDescription
             }
           >
-            편하게 이야기를
-            들려주셔서 고마워요.
+            {summary ?? '편하게 이야기를 들려주셔서 고마워요.'}
           </Text>
 
           <TouchableOpacity
@@ -309,8 +325,8 @@ export default function VoiceTalkScreen() {
                 styles.turnText
               }
             >
-              {turn + 1} /{' '}
-              {questions.length}
+              {Math.min(answeredCount + 1, totalQuestions)} /{' '}
+              {totalQuestions}
             </Text>
           </View>
 
@@ -362,9 +378,16 @@ export default function VoiceTalkScreen() {
                 styles.questionText
               }
             >
-              {questions[turn]}
+              {question || '시작 버튼을 누르면 첫 질문을 들려드릴게요.'}
             </Text>
           </View>
+
+          {transcript.trim().length > 0 && (
+            <View style={styles.answerBubble}>
+              <Text style={styles.answerLabel}>나</Text>
+              <Text style={styles.answerText}>{transcript}</Text>
+            </View>
+          )}
 
           {started && (
             <View
@@ -392,13 +415,13 @@ export default function VoiceTalkScreen() {
             </View>
           )}
 
-          {!!errorMessage && (
+          {!!(errorMessage || speechError) && (
             <Text
               style={
                 styles.errorText
               }
             >
-              {errorMessage}
+              {errorMessage || speechError}
             </Text>
           )}
         </View>
@@ -536,7 +559,13 @@ const styles =
     },
 
     questionLabel: {
-      fontSize: 17,
+      alignSelf: 'flex-start',
+      borderRadius: 12,
+      backgroundColor: '#E7F6EF',
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      fontSize: 15,
+      lineHeight: 20,
       fontFamily: fonts.bold,
       color: colors.primary,
     },
@@ -546,6 +575,35 @@ const styles =
       fontSize: 27,
       lineHeight: 39,
       fontFamily: fonts.bold,
+      color: '#191F28',
+    },
+
+    answerBubble: {
+      marginTop: 16,
+      marginLeft: 36,
+      borderRadius: 20,
+      backgroundColor: '#EAF5F0',
+      paddingHorizontal: 22,
+      paddingVertical: 18,
+    },
+
+    answerLabel: {
+      alignSelf: 'flex-start',
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      fontSize: 15,
+      lineHeight: 20,
+      fontFamily: fonts.bold,
+      color: colors.primary,
+    },
+
+    answerText: {
+      marginTop: 8,
+      fontSize: 21,
+      lineHeight: 31,
+      fontFamily: fonts.medium,
       color: '#191F28',
     },
 

@@ -553,7 +553,7 @@ export default function AssistantScreen() {
   const formatAiReply = (result: IntentAnalyzeResponse) => {
     if (result.intent === "TRANSFER") {
       if (result.recipientKeyword && result.amount !== null) {
-        return "송금 내용을 확인해 주세요.";
+        return "이렇게 보내시는 게 맞나요?";
       }
       if (result.recipientKeyword) {
         return `${result.recipientKeyword}에게 얼마를 보내실까요?`;
@@ -1406,6 +1406,9 @@ export default function AssistantScreen() {
               {message.role === "assistant" && (
                 <Text style={styles.assistantLabel}>든든</Text>
               )}
+              {message.role === "user" && (
+                <Text style={styles.userLabel}>나</Text>
+              )}
               {message.role === "assistant" && message.balancePreview ? (
                 <View style={styles.inquiryCard}>
                   <View style={styles.inquiryTitleRow}>
@@ -1521,9 +1524,9 @@ export default function AssistantScreen() {
                   >
                     {message.text}
                   </Text>
-                  {(requiresGuardianReview(message.fdsResult) ||
-                    message.fdsResult.recommendedAction === "RECONFIRM" ||
-                    message.fdsResult.riskLevel === "CAUTION") &&
+                  {!requiresGuardianReview(message.fdsResult) &&
+                    (message.fdsResult.recommendedAction === "RECONFIRM" ||
+                      message.fdsResult.riskLevel === "CAUTION") &&
                     message.fdsResult.reasons.map((reason, index) => (
                       <View
                         key={`${message.id}-fds-reason-${index}`}
@@ -1636,7 +1639,7 @@ export default function AssistantScreen() {
                 <View style={styles.transferCard}>
                   <View style={styles.transferConfirmationContent}>
                     <Text style={styles.cardQuestion}>
-                      송금 내용을 확인해 주세요
+                      이렇게 보내시는 게 맞나요?
                     </Text>
                     <View
                       style={[styles.partySection, styles.recipientSection]}
@@ -2232,17 +2235,27 @@ const styles = StyleSheet.create({
   },
   assistantLabel: {
     color: colors.primary,
-    fontSize: seniorTypography.caption,
-    lineHeight: 26,
-    fontFamily: fonts.semiBold,
-    marginBottom: 6,
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: fonts.bold,
+    alignSelf: "flex-start",
+    backgroundColor: "#E7F6EF",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginBottom: 8,
   },
   userLabel: {
-    color: "#DDF3EA",
-    fontSize: seniorTypography.caption,
-    lineHeight: 24,
-    fontFamily: fonts.semiBold,
-    marginBottom: 4,
+    color: "#146C54",
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: fonts.bold,
+    alignSelf: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginBottom: 8,
   },
   messageText: {
     color: colors.text,

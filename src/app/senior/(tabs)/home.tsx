@@ -68,7 +68,12 @@ export default function SeniorHomeScreen() {
           <TouchableOpacity
             activeOpacity={0.75}
             style={styles.menuButton}
-            onPress={() => router.push('/senior/transfer/request')}
+            onPress={() =>
+              router.push({
+                pathname: '/senior/assistant',
+                params: { intentHint: 'TRANSFER' },
+              })
+            }
           >
             <View style={styles.textArea}>
               <Text style={styles.menuTitle}>돈 보내기</Text>
