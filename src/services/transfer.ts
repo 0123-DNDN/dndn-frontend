@@ -38,15 +38,16 @@ export type TransferFdsResponse = {
     riskLevel: "LOW" | "CAUTION" | "HIGH" | "CRITICAL";
     riskScore: number;
     reasons: string[];
+    hardRuleTriggered: boolean;
+    combinationRuleTriggered: boolean;
+    triggeredRules: string[];
+    contextAnalysisSucceeded: boolean;
   };
 };
 
 export async function createTransfer(request: {
   senderAccountId: number;
-  receiverAccountId: number | null;
-  receiverBankCode: string;
-  receiverAccountNumber: string;
-  receiverName: string;
+  recipientAlias: string;
   amount: number;
   purpose: string;
 }): Promise<TransferResponse> {
@@ -99,9 +100,14 @@ export async function guardianRejectTransfer(
 
 export async function checkTransferFds(
   transactionId: number,
+  request: {
+    detectedSignals: string[];
+    followUpAnswers: Array<{ code: string; answer: boolean }>;
+  },
 ): Promise<TransferFdsResponse> {
   const response = await api.post<TransferFdsResponse>(
     `/api/transfers/${transactionId}/fds-check`,
+    request,
   );
   return response.data;
 }

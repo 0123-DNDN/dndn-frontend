@@ -34,6 +34,7 @@ import {
 } from "@/services/transfer";
 import type { TransactionResponse } from "@/types/transaction";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -654,7 +655,7 @@ export default function AssistantScreen() {
 
   const requestFdsAnalysis = async (
     result: ContextAnalyzeResponse,
-    _answers: FollowUpAnswer[],
+    answers: FollowUpAnswer[],
   ) => {
     const transfer = transferIntentRef.current;
     const recipient = transferRecipientRef.current;
@@ -666,10 +667,7 @@ export default function AssistantScreen() {
     if (!senderAccount) throw new Error("출금계좌가 준비되지 않았습니다.");
     const created = await createTransfer({
       senderAccountId: senderAccount.accountId,
-      receiverAccountId: null,
-      receiverBankCode: recipient.bankCode,
-      receiverAccountNumber: recipient.accountNumber,
-      receiverName: recipient.recipientName,
+      recipientAlias: recipient.aliasName,
       amount: transfer.amount,
       purpose: purposeTextRef.current,
     });
@@ -683,14 +681,13 @@ export default function AssistantScreen() {
       "[AI transfer amount confirmed]",
       await confirmTransferAmount(created.transactionId),
     );
-    const checked = await checkTransferFds(created.transactionId);
+    const checked = await checkTransferFds(created.transactionId, {
+      detectedSignals: result.detectedSignals,
+      followUpAnswers: answers.map(({ code, answer }) => ({ code, answer })),
+    });
     console.log("[AI transfer FDS checked]", checked);
     const fdsResult: FdsAnalyzeResponse = {
       ...checked.fds,
-      hardRuleTriggered: false,
-      combinationRuleTriggered: false,
-      triggeredRules: [],
-      contextAnalysisSucceeded: true,
     };
     console.log("[AI FDS response]", fdsResult);
     const requiresGuardian = requiresGuardianReview(fdsResult);
@@ -955,8 +952,18 @@ export default function AssistantScreen() {
       }
     } catch (error) {
       if (currentRequestVersion !== requestVersion.current) return;
-      console.warn("[AI request failed]", error);
+      const responseMessage = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      console.warn("[AI request failed]", {
+        message: error instanceof Error ? error.message : String(error),
+        method: axios.isAxiosError(error) ? error.config?.method : undefined,
+        url: axios.isAxiosError(error) ? error.config?.url : undefined,
+        status: axios.isAxiosError(error) ? error.response?.status : undefined,
+        response: axios.isAxiosError(error) ? error.response?.data : undefined,
+      });
       const errorMessage =
+        responseMessage ??
         "서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.";
       appendMessage("assistant", errorMessage);
       speak(errorMessage, true);
