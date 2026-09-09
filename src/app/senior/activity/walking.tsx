@@ -6,6 +6,7 @@ import {
 } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -19,28 +20,17 @@ import {
   fonts,
   seniorTypography,
 } from '@/constants/typography';
-import {
-  getTodayActivityByType,
-  saveActivityResult,
-} from '@/services/activity';
-import type {
-  TodayActivityResponse,
-} from '@/types/activity';
+const TARGET_STEPS = 3000;
 
-const DEMO_DEVICE_STEPS = 1840;
+const STEP_READ_PERMISSION = {
+  accessType: 'read',
+  recordType: 'Steps',
+} as const;
 
 export default function WalkingScreen() {
   const [
-    activity,
-    setActivity,
-  ] =
-    useState<TodayActivityResponse | null>(
-      null,
-    );
-
-  const [
-    currentSteps,
-    setCurrentSteps,
+    stepCount,
+    setStepCount,
   ] = useState(0);
 
   const [
@@ -49,8 +39,8 @@ export default function WalkingScreen() {
   ] = useState(true);
 
   const [
-    isSaving,
-    setIsSaving,
+    isRefreshing,
+    setIsRefreshing,
   ] = useState(false);
 
   const [
@@ -59,47 +49,151 @@ export default function WalkingScreen() {
   ] = useState('');
 
   useEffect(() => {
-    loadActivity();
+    void loadStepCount(true);
   }, []);
 
-  const loadActivity =
-    async () => {
-      try {
+  const loadStepCount =
+    async (
+      isInitialLoad = false,
+    ) => {
+      if (isInitialLoad) {
         setIsLoading(true);
-        setErrorMessage('');
+      } else {
+        setIsRefreshing(true);
+      }
 
-        const result =
-          await getTodayActivityByType(
-            'WALKING',
+      setErrorMessage('');
+
+      if (
+        Platform.OS !==
+        'android'
+      ) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      try {
+        const {
+          aggregateRecord,
+          getGrantedPermissions,
+          getSdkStatus,
+          initialize,
+          requestPermission,
+          SdkAvailabilityStatus,
+        } = await import(
+          'react-native-health-connect'
+        );
+
+        const sdkStatus =
+          await getSdkStatus();
+
+        if (
+          sdkStatus !==
+          SdkAvailabilityStatus.SDK_AVAILABLE
+        ) {
+          setStepCount(0);
+          setErrorMessage(
+            '이 기기에서는 Health Connect를 사용할 수 없어요.',
+          );
+          return;
+        }
+
+        const isInitialized =
+          await initialize();
+
+        if (!isInitialized) {
+          setStepCount(0);
+          setErrorMessage(
+            'Health Connect를 시작하지 못했어요.',
+          );
+          return;
+        }
+
+        const grantedPermissions =
+          await getGrantedPermissions();
+
+        let isStepReadGranted =
+          grantedPermissions.some(
+            (permission) =>
+              permission.accessType ===
+                'read' &&
+              permission.recordType ===
+                'Steps',
           );
 
-        setActivity(result);
+        if (!isStepReadGranted) {
+          const requestedPermissions =
+            await requestPermission([
+              STEP_READ_PERMISSION,
+            ]);
 
-        setCurrentSteps(
-          result?.stepCount ?? 0,
+          isStepReadGranted =
+            requestedPermissions.some(
+              (permission) =>
+                permission.accessType ===
+                  'read' &&
+                permission.recordType ===
+                  'Steps',
+            );
+        }
+
+        if (!isStepReadGranted) {
+          setStepCount(0);
+          setErrorMessage(
+            '걸음 수 읽기 권한이 필요해요.',
+          );
+          return;
+        }
+
+        const now = new Date();
+        const startOfToday =
+          new Date(now);
+        startOfToday.setHours(
+          0,
+          0,
+          0,
+          0,
+        );
+
+        const result =
+          await aggregateRecord({
+            recordType: 'Steps',
+            timeRangeFilter: {
+              operator: 'between',
+              startTime:
+                startOfToday.toISOString(),
+              endTime:
+                now.toISOString(),
+            },
+          });
+
+        setStepCount(
+          result.COUNT_TOTAL ?? 0,
         );
       } catch (error) {
         console.log(
-          'WALKING LOAD ERROR:',
+          'HEALTH CONNECT STEPS ERROR:',
           error,
         );
 
+        setStepCount(0);
         setErrorMessage(
-          '걷기 정보를 불러오지 못했어요.',
+          '걸음 수를 불러오지 못했어요.',
         );
       } finally {
         setIsLoading(false);
+        setIsRefreshing(false);
       }
     };
 
   const targetSteps =
-    activity?.targetValue ??
-    3000;
+    TARGET_STEPS;
 
   const progress =
     targetSteps > 0
       ? Math.min(
-          currentSteps /
+          stepCount /
             targetSteps,
           1,
         )
@@ -108,78 +202,20 @@ export default function WalkingScreen() {
   const remaining =
     Math.max(
       targetSteps -
-        currentSteps,
+        stepCount,
       0,
     );
 
   const completed =
-    activity?.completed ??
-    currentSteps >=
-      targetSteps;
+    stepCount >= targetSteps;
 
   const handleRefresh =
     async () => {
-      if (
-        !activity ||
-        isSaving
-      ) {
+      if (isRefreshing) {
         return;
       }
 
-      /*
-       * TODO:
-       * HealthKit / Health Connect 붙으면
-       * DEMO_DEVICE_STEPS 대신
-       * 실제 걸음 수를 넣으면 됨.
-       */
-      const syncedSteps =
-        DEMO_DEVICE_STEPS;
-
-      try {
-        setIsSaving(true);
-        setErrorMessage('');
-
-        const result =
-          await saveActivityResult(
-            activity.activityId,
-            {
-              stepCount:
-                syncedSteps,
-            },
-          );
-
-        setCurrentSteps(
-          result.stepCount ??
-            syncedSteps,
-        );
-
-        setActivity(
-          (prev) =>
-            prev
-              ? {
-                  ...prev,
-                  stepCount:
-                    result.stepCount,
-                  status:
-                    result.status,
-                  completed:
-                    result.status ===
-                    'COMPLETED',
-                }
-              : prev,
-        );
-      } catch (error) {
-        console.log(
-          'WALKING SAVE ERROR:',
-          error,
-        );
-
-        setErrorMessage(
-          '걸음 수를 저장하지 못했어요.',
-        );
-      } finally {
-        setIsSaving(false);
-      }
+      await loadStepCount();
     };
 
   if (isLoading) {
@@ -284,7 +320,7 @@ export default function WalkingScreen() {
                 styles.stepCount
               }
             >
-              {currentSteps.toLocaleString()}
+              {stepCount.toLocaleString()}
             </Text>
 
             <Text
@@ -394,7 +430,7 @@ export default function WalkingScreen() {
                 styles.infoText
               }
             >
-              현재는 시연용 걸음 수를
+              Health Connect의 오늘 걸음 수를
               사용하고 있어요.
             </Text>
           </View>
@@ -402,16 +438,16 @@ export default function WalkingScreen() {
           <TouchableOpacity
             style={[
               styles.refreshButton,
-              isSaving &&
+              isRefreshing &&
                 styles.disabledButton,
             ]}
             activeOpacity={0.75}
-            disabled={isSaving}
+            disabled={isRefreshing}
             onPress={
               handleRefresh
             }
           >
-            {isSaving ? (
+            {isRefreshing ? (
               <ActivityIndicator
                 color={
                   colors.primary
