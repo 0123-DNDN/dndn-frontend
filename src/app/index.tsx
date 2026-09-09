@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import {
+  Image,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -33,11 +34,12 @@ export default function StartScreen() {
             duration={520}
             distance={18}
           >
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoText}>
-                든든 DNDN
-              </Text>
-            </View>
+            <Image
+              source={require('@/assets/images/dndn-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityLabel="든든 DNDN 로고"
+            />
           </SlideFadeIn>
 
           <SlideFadeIn
@@ -112,19 +114,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  logoBadge: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 18,
-    backgroundColor: '#EAF5F0',
+  logo: {
+    width: 88,
+    height: 88,
     marginBottom: 28,
-  },
-
-  logoText: {
-    fontSize: 20,
-    lineHeight: 28,
-    fontFamily: fonts.bold,
-    color: colors.primary,
   },
 
   title: {

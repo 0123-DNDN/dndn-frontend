@@ -21,6 +21,18 @@ export type VoiceTalkAnswerResponse = {
   completed: boolean;
 };
 
+export type VoiceConditionRequest = {
+  speechDurationMs: number;
+  speechRate: number;
+  avgPauseDurationMs: number | null;
+  longPauseCount: number | null;
+};
+
+export type VoiceTalkAnswerRequest = {
+  text: string;
+  voiceCondition?: VoiceConditionRequest;
+};
+
 export async function startVoiceTalkSession(): Promise<VoiceTalkStartResponse> {
   const response = await api.post<VoiceTalkStartResponse>(
     '/api/activities/voice-talk/sessions',
@@ -30,11 +42,11 @@ export async function startVoiceTalkSession(): Promise<VoiceTalkStartResponse> {
 
 export async function submitVoiceTalkAnswer(
   sessionId: number,
-  text: string,
+  request: VoiceTalkAnswerRequest,
 ): Promise<VoiceTalkAnswerResponse> {
   const response = await api.post<VoiceTalkAnswerResponse>(
     `/api/activities/voice-talk/sessions/${sessionId}/answers`,
-    { text },
+    request,
   );
   return response.data;
 }
