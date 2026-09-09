@@ -62,6 +62,13 @@ export async function getTodayActivities(): Promise<
   return response.data;
 }
 
+export async function getGuardianTodayActivities(): Promise<TodayActivityResponse[]> {
+  const response = await api.get<TodayActivityResponse[]>(
+    '/api/activities/guardian/today',
+  );
+  return response.data;
+}
+
 export async function getTodayActivityByType(
   activityType: ActivityType,
 ): Promise<TodayActivityResponse | null> {

@@ -17,7 +17,7 @@ export default function TransferCompleteScreen() {
           </View>
 
           <Text style={styles.title}>
-            허경민님에게{'\n'}
+            박윤아님에게{'\n'}
             500,000원을 보냈어요.
           </Text>
 

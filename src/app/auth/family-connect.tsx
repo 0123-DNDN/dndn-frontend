@@ -547,9 +547,8 @@ function GuardianFamilyConnect() {
                       styles.relationshipName
                     }
                   >
-                    사용자 #
                     {
-                      relation.seniorUserId
+                      relation.seniorName
                     }
                   </Text>
                 </View>
@@ -576,22 +575,13 @@ function GuardianFamilyConnect() {
                       styles.relationshipName
                     }
                   >
-                    사용자 #
                     {
-                      relation.guardianUserId
+                      relation.guardianName
                     }
                   </Text>
                 </View>
               </View>
 
-              <Text
-                style={
-                  styles.relationStatus
-                }
-              >
-                연결 상태:{' '}
-                {relation.status}
-              </Text>
             </SlideFadeIn>
           </View>
 
@@ -1060,12 +1050,4 @@ const styles =
       color: colors.muted,
     },
 
-    relationStatus: {
-      marginTop: 12,
-      fontSize: 14,
-      fontFamily:
-        fonts.regular,
-      color: colors.muted,
-      textAlign: 'center',
-    },
   });

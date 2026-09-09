@@ -5,6 +5,7 @@ import {
 } from 'react';
 import {
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,7 +21,7 @@ import { getMyProfile } from '@/services/user';
 
 export default function SeniorHomeScreen() {
   const [userName, setUserName] =
-    useState('김영희');
+    useState('김명숙');
 
   useEffect(() => {
     const loadUser = async () => {
@@ -42,7 +43,7 @@ export default function SeniorHomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.greeting}>
           {userName}님,{'\n'}
           무엇을 도와드릴까요?
@@ -102,7 +103,7 @@ export default function SeniorHomeScreen() {
             <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -114,7 +115,8 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
+    flexGrow: 1,
+    paddingBottom: 24,
     paddingHorizontal: spacing.page,
     paddingTop: 18,
   },
