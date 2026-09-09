@@ -1,4 +1,5 @@
 import { colors } from "@/constants/colors";
+import { router } from "expo-router";
 import { spacing } from "@/constants/spacing";
 import { fonts, seniorTypography } from "@/constants/typography";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
@@ -109,16 +110,14 @@ const getTransactionStatusText = (status: TransactionResponse["status"]) => {
 };
 
 const requiresGuardianReview = (fds: FdsAnalyzeResponse) =>
-  fds.recommendedAction === "HOLD" ||
-  fds.recommendedAction === "WARN" ||
-  fds.riskLevel === "HIGH" ||
-  fds.riskLevel === "CRITICAL";
+  fds.recommendedAction === "HOLD" || fds.riskLevel === "CRITICAL";
 
 const getFdsBadgeText = (fds: FdsAnalyzeResponse, approved = false) => {
   if (approved) return "보호자 승인 완료";
   if (requiresGuardianReview(fds)) return "고위험 거래";
+  if (fds.riskLevel === "HIGH") return "위험 · 5시간 대기";
   if (fds.recommendedAction === "RECONFIRM" || fds.riskLevel === "CAUTION")
-    return "주의 거래";
+    return "경고 · 재확인";
   return "최종 확인";
 };
 
@@ -695,10 +694,12 @@ export default function AssistantScreen() {
     const requiresGuardian = requiresGuardianReview(fdsResult);
     const reply = requiresGuardian
       ? "위험한 거래로 판단되어 송금을 멈췄어요. 보호자 확인이 필요합니다."
-      : fdsResult.recommendedAction === "RECONFIRM" ||
-          fdsResult.riskLevel === "CAUTION"
-        ? "주의가 필요한 송금이에요. 내용을 다시 확인하고 송금할까요?"
-        : "마지막으로 확인할게요. 이대로 송금할까요?";
+      : fdsResult.riskLevel === "HIGH"
+        ? "위험 신호가 있어요. 내용을 확인하면 5시간 대기를 시작합니다. 보호자가 승인하면 더 일찍 보낼 수 있어요."
+        : fdsResult.recommendedAction === "RECONFIRM" ||
+            fdsResult.riskLevel === "CAUTION"
+          ? "주의가 필요한 송금이에요. 내용을 다시 확인하고 송금할까요?"
+          : "마지막으로 확인할게요. 이대로 송금할까요?";
     const fdsMessageId = appendMessage(
       "assistant",
       reply,
@@ -986,8 +987,7 @@ export default function AssistantScreen() {
       pauseDurations: voicePauseDurationsRef.current,
       finishedAt: Date.now(),
     });
-    lastAvgPauseDurationRef.current =
-      voiceMetrics?.avgPauseDurationMs ?? null;
+    lastAvgPauseDurationRef.current = voiceMetrics?.avgPauseDurationMs ?? null;
     lastLongPauseCountRef.current = voiceMetrics?.longPauseCount ?? 0;
     lastVoiceDurationRef.current = voiceMetrics?.speechDurationMs ?? null;
     voiceStartedAtRef.current = null;
@@ -1226,6 +1226,17 @@ export default function AssistantScreen() {
     try {
       if (!transactionId) throw new Error("송금 번호가 없습니다.");
       if (action === "continue") {
+        const latest = await getTransfer(transactionId);
+        if (
+          latest.status === "DELAY_CONFIRM" ||
+          (latest.status === "WAITING_GUARDIAN" && latest.availableAt)
+        ) {
+          router.push("/senior/transfer/pending" as never);
+          setHandledFdsCardIds((current) =>
+            current.filter((id) => id !== messageId),
+          );
+          return;
+        }
         const fdsMessage = messages.find((message) => message.id === messageId);
         const fds = fdsMessage?.fdsResult;
         const requiresGuardian = fds ? requiresGuardianReview(fds) : true;
@@ -1246,6 +1257,9 @@ export default function AssistantScreen() {
       }
     } catch (error) {
       console.warn("[AI transfer action failed]", error);
+      setHandledFdsCardIds((current) =>
+        current.filter((id) => id !== messageId),
+      );
       reply =
         "송금을 처리하지 못했어요. 계좌 상태를 확인한 뒤 다시 시도해 주세요.";
     }
@@ -1475,7 +1489,7 @@ export default function AssistantScreen() {
                                 "RECONFIRM" ||
                               message.fdsResult.riskLevel === "CAUTION"
                             ? styles.cautionBadge
-                            : styles.safeBadge,
+                            : styles.finalConfirmBadge,
                     ]}
                   >
                     <Text
@@ -1489,7 +1503,7 @@ export default function AssistantScreen() {
                                   "RECONFIRM" ||
                                 message.fdsResult.riskLevel === "CAUTION"
                               ? styles.cautionBadgeText
-                              : styles.safeBadgeText,
+                              : styles.finalConfirmBadgeText,
                       ]}
                     >
                       {getFdsBadgeText(
@@ -1514,9 +1528,7 @@ export default function AssistantScreen() {
                   >
                     {message.text}
                   </Text>
-                  {!requiresGuardianReview(message.fdsResult) &&
-                    (message.fdsResult.recommendedAction === "RECONFIRM" ||
-                      message.fdsResult.riskLevel === "CAUTION") &&
+                  {message.fdsResult.riskLevel === "CAUTION" &&
                     message.fdsResult.reasons.map((reason, index) => (
                       <View
                         key={`${message.id}-fds-reason-${index}`}
@@ -1550,7 +1562,10 @@ export default function AssistantScreen() {
                             ]}
                           >
                             <Text style={styles.resultPrimaryButtonText}>
-                              송금하기
+                              {message.fdsResult.riskLevel === "HIGH" &&
+                              !message.guardianApproved
+                                ? "내용 확인하고 대기"
+                                : "송금하기"}
                             </Text>
                           </Pressable>
                         )}
@@ -2269,6 +2284,7 @@ const styles = StyleSheet.create({
   cautionBadge: { backgroundColor: "#FFF4D6" },
   approvedBadge: { backgroundColor: "#E7F6EF" },
   safeBadge: { backgroundColor: "#E8F4EF" },
+  finalConfirmBadge: { backgroundColor: "#EAF0FF" },
   contextBadgeText: {
     fontSize: seniorTypography.caption,
     lineHeight: 26,
@@ -2278,6 +2294,7 @@ const styles = StyleSheet.create({
   cautionBadgeText: { color: "#8A5A00" },
   approvedBadgeText: { color: "#146C54" },
   safeBadgeText: { color: colors.primary },
+  finalConfirmBadgeText: { color: "#3456A6" },
   contextTitle: {
     fontSize: seniorTypography.bodyStrong,
     lineHeight: 31,

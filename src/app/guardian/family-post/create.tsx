@@ -194,7 +194,7 @@ export default function FamilyPostCreateScreen() {
                 styles.subtitle
               }
             >
-              김영희님에게 따뜻한
+              김명숙님에게 따뜻한
               메시지를 보내요.
             </Text>
 

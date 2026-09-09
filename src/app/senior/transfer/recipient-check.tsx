@@ -23,13 +23,13 @@ export default function RecipientCheckScreen() {
 
         <View style={styles.centerArea}>
           <Text style={styles.heroText}>
-            허경민님에게{'\n'}
+            박윤아님에게{'\n'}
             500,000원을{'\n'}
             보내시겠어요?
           </Text>
 
           <View style={styles.recipientCard}>
-            <Text style={styles.name}>허경민</Text>
+            <Text style={styles.name}>박윤아</Text>
             <Text style={styles.detail}>KB국민은행</Text>
             <Text style={styles.detail}>123-***-8890</Text>
           </View>

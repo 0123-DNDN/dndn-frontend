@@ -6,6 +6,7 @@ export type ApiTransferStatus =
   | "AMOUNT_CONFIRMED"
   | "FDS_CHECKING"
   | "NORMAL"
+  | "DELAY_CONFIRM"
   | "HIGH_RISK"
   | "WAITING_GUARDIAN"
   | "GUARDIAN_APPROVED"
@@ -28,6 +29,14 @@ export type TransferResponse = {
   status: ApiTransferStatus;
   createdAt: string;
   completedAt: string | null;
+  availableAt: string | null;
+  finalConfirmationAvailable: boolean;
+  blocked: boolean;
+  senderName?: string;
+  senderPhone?: string;
+  riskLevel: "LOW" | "CAUTION" | "HIGH" | "CRITICAL" | null;
+  riskScore: number | null;
+  riskReasons: string[];
 };
 
 export type TransferFdsResponse = {
@@ -68,6 +77,16 @@ export const confirmTransferAmount = (id: number) =>
   advanceTransfer(id, "amount-confirm");
 export const finalConfirmTransfer = (id: number) =>
   advanceTransfer(id, "final-confirm");
+export const confirmTransferDelay = (id: number) => advanceTransfer(id, "delay-confirm");
+export async function getPendingTransfers(): Promise<TransferResponse[]> {
+  return (await api.get<TransferResponse[]>("/api/transfers/pending")).data;
+}
+export async function getGuardianTransfer(id: number): Promise<TransferResponse> {
+  return (await api.get<TransferResponse>(`/api/transfers/${id}/guardian-review`)).data;
+}
+export async function getGuardianPendingTransfers(): Promise<TransferResponse[]> {
+  return (await api.get<TransferResponse[]>('/api/transfers/guardian/pending')).data;
+}
 export const completeTransfer = (id: number) => advanceTransfer(id, "complete");
 export const cancelTransfer = (id: number) => advanceTransfer(id, "cancel");
 

@@ -12,7 +12,7 @@ export default function TransferConfirmScreen() {
           <Text style={styles.title}>송금 내용을 확인해 주세요</Text>
           <View style={styles.card}>
             <Text style={styles.label}>받는 분</Text>
-            <Text style={styles.value}>{risk === 'true' ? '김상우' : '허경민'}</Text>
+            <Text style={styles.value}>{risk === 'true' ? '김상우' : '박윤아'}</Text>
             <Text style={styles.detail}>{risk === 'true' ? '신한은행 · 110-***-4821' : 'KB국민은행 · 123-***-8890'}</Text>
             <Text style={styles.label}>보낼 금액</Text>
             <Text style={styles.amount}>{risk === 'true' ? '5,000,000원' : '500,000원'}</Text>

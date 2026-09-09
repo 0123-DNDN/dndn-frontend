@@ -445,7 +445,7 @@ export default function LoginScreen() {
           behavior={
             Platform.OS === 'ios'
               ? 'padding'
-              : undefined
+              : 'height'
           }
         >
           <View
@@ -1015,11 +1015,6 @@ export default function LoginScreen() {
                 </Text>
               )}
 
-              <View
-                style={
-                  styles.bottomSpacer
-                }
-              />
             </ScrollView>
 
             <View
@@ -1203,10 +1198,6 @@ const styles =
       fontFamily:
         fonts.medium,
       color: '#F04452',
-    },
-
-    bottomSpacer: {
-      height: 260,
     },
 
     buttonArea: {

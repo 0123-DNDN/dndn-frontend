@@ -1,28 +1,28 @@
-﻿import { useCallback, useState } from "react";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { ScrollView, Text, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TransferReviewCard from "@/components/TransferReviewCard";
 import {
-  getGuardianTransfer,
+  getPendingTransfers,
   type TransferResponse,
 } from "@/services/transfer";
 import { getApiErrorMessage } from "@/services/auth";
 
-export default function GuardianTransferReview() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [transfer, setTransfer] = useState<TransferResponse | null>(null);
+export default function PendingTransfers() {
+  const [items, setItems] = useState<TransferResponse[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const refresh = useCallback(async () => {
     try {
-      const result = await getGuardianTransfer(Number(id));
-      setTransfer(result);
+      setItems(await getPendingTransfers());
       setError("");
     } catch (err) {
-      setTransfer(null);
-      setError(getApiErrorMessage(err, "거래 정보를 불러오지 못했어요."));
+      setError(getApiErrorMessage(err, "보류 중인 송금을 불러오지 못했어요."));
+    } finally {
+      setLoading(false);
     }
-  }, [id]);
+  }, []);
   useFocusEffect(
     useCallback(() => {
       void refresh();
@@ -34,10 +34,7 @@ export default function GuardianTransferReview() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F7F8FA" }}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <Text style={{ fontSize: 26, fontWeight: "700", marginBottom: 20 }}>
-          가족 송금 확인
-        </Text>
-        <Text style={{ fontSize: 17, lineHeight: 26, marginBottom: 20 }}>
-          가족과 직접 연락해 송금 이유와 받는 계좌를 확인해 주세요.
+          보류 중인 송금
         </Text>
         {!!error && (
           <Text style={{ color: "#C43D3D", marginBottom: 16 }}>{error}</Text>
@@ -45,11 +42,18 @@ export default function GuardianTransferReview() {
         <TouchableOpacity onPress={() => void refresh()}>
           <Text style={{ fontSize: 17, marginBottom: 20 }}>새로고침</Text>
         </TouchableOpacity>
-        {transfer ? (
-          <TransferReviewCard transfer={transfer} guardian refresh={refresh} />
+        {loading ? (
+          <Text>불러오는 중…</Text>
         ) : (
-          !error && <Text>불러오는 중…</Text>
+          !error && !items.length && <Text>보류 중인 송금이 없어요.</Text>
         )}
+        {items.map((item) => (
+          <TransferReviewCard
+            key={item.transactionId}
+            transfer={item}
+            refresh={refresh}
+          />
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

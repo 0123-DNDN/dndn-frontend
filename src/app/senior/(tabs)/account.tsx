@@ -18,7 +18,7 @@ import {
 const transactions = [
   {
     id: 1,
-    name: '허경민',
+    name: '박윤아',
     description: '오늘 14:20 · 송금 완료',
     value: '-500,000원',
     type: 'expense',

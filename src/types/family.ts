@@ -17,6 +17,8 @@ export type FamilyRelationResponse = {
   relationshipId: number;
   seniorUserId: number;
   guardianUserId: number;
+  seniorName: string;
+  guardianName: string;
   status: FamilyRelationshipStatus | string;
 };
 
