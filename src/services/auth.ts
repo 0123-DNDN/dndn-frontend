@@ -2,13 +2,20 @@ import axios from 'axios';
 
 import { api } from '@/services/api';
 import { saveAccessToken } from '@/services/token';
-// import type {
-//   ApiErrorResponse,
-//   LoginRequest,
-//   LoginResponse,
-//   SignupRequest,
-//   User,
-// } from '@/types/user';
+import type {
+  ApiErrorResponse,
+  LoginRequest,
+  LoginResponse,
+  SignupRequest,
+  User,
+} from '@/types/user';
+
+export async function getCurrentUser(): Promise<User> {
+  const response =
+    await api.get<User>('/api/users/me');
+
+  return response.data;
+}
 
 export async function signup(
   request: SignupRequest,

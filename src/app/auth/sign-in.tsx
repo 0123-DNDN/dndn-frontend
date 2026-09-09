@@ -19,6 +19,7 @@ import SlideFadeIn from "@/components/SlideFadeIn";
 import { colors } from "@/constants/colors";
 import { fonts, seniorTypography } from "@/constants/typography";
 import { getApiErrorMessage, loginAndSaveToken } from "@/services/auth";
+import { registerPushToken } from "@/services/pushNotification";
 
 export default function SignInScreen() {
   const [phone, setPhone] = useState("");
@@ -52,6 +53,12 @@ export default function SignInScreen() {
         phone,
         password,
       });
+
+      try {
+        await registerPushToken();
+      } catch (pushError) {
+        console.warn("PUSH TOKEN REGISTRATION ERROR:", pushError);
+      }
 
       if (response.role === "SENIOR") {
         router.replace("/senior/home");

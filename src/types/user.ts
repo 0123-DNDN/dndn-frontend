@@ -34,6 +34,8 @@ export type UserProfileResponse = {
   birthDate: string;
 };
 
+export type User = UserProfileResponse;
+
 export type ApiErrorResponse = {
   message?: string;
   error?: string;

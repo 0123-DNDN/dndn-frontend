@@ -28,6 +28,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       "react-native-health-connect",
       [
         "expo-build-properties",
