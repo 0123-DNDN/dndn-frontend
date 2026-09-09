@@ -52,71 +52,49 @@ export default function SeniorHomeScreen() {
           <TouchableOpacity
             activeOpacity={0.75}
             style={styles.menuButton}
-            onPress={() =>
-              router.push('/senior/account')
-            }
+            onPress={() => router.push('/senior/account')}
           >
             <View style={styles.textArea}>
-              <Text style={styles.menuTitle}>
-                내 통장 보기
-              </Text>
+              <Text style={styles.menuTitle}>내 통장 보기</Text>
 
               <Text style={styles.menuDescription}>
                 잔액과 거래내역을 확인해요
               </Text>
             </View>
 
-            <Text style={styles.arrow}>
-              ›
-            </Text>
+            <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.75}
             style={styles.menuButton}
-            onPress={() =>
-              router.push(
-                '/senior/transfer/request',
-              )
-            }
+            onPress={() => router.push('/senior/transfer/request')}
           >
             <View style={styles.textArea}>
-              <Text style={styles.menuTitle}>
-                돈 보내기
-              </Text>
+              <Text style={styles.menuTitle}>돈 보내기</Text>
 
               <Text style={styles.menuDescription}>
                 말로 쉽고 안전하게 보내요
               </Text>
             </View>
 
-            <Text style={styles.arrow}>
-              ›
-            </Text>
+            <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.75}
             style={styles.menuButton}
-            onPress={() =>
-              router.push(
-                '/senior/notifications',
-              )
-            }
+            onPress={() => router.push('/senior/notifications')}
           >
             <View style={styles.textArea}>
-              <Text style={styles.menuTitle}>
-                정기결제 확인
-              </Text>
+              <Text style={styles.menuTitle}>정기결제 확인</Text>
 
               <Text style={styles.menuDescription}>
                 정기결제 및 자동이체를 확인해요
               </Text>
             </View>
 
-            <Text style={styles.arrow}>
-              ›
-            </Text>
+            <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -144,8 +122,7 @@ const styles = StyleSheet.create({
   },
 
   greeting: {
-    fontSize:
-      seniorTypography.pageTitle,
+    fontSize: seniorTypography.pageTitle,
     fontFamily: fonts.bold,
     lineHeight: 42,
     letterSpacing: -0.8,
@@ -159,21 +136,17 @@ const styles = StyleSheet.create({
 
   menuButton: {
     width: '100%',
-    minHeight:
-      spacing.touchTarget * 2 +
-      spacing.content,
+    minHeight: spacing.touchTarget * 2 + spacing.content,
 
     backgroundColor: '#FFFFFF',
-    borderRadius:
-      spacing.cardRadius,
+    borderRadius: spacing.cardRadius,
 
     paddingHorizontal: 22,
     paddingVertical: 22,
 
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent:
-      'space-between',
+    justifyContent: 'space-between',
   },
 
   textArea: {
@@ -181,8 +154,7 @@ const styles = StyleSheet.create({
   },
 
   menuTitle: {
-    fontSize:
-      seniorTypography.sectionTitle,
+    fontSize: seniorTypography.sectionTitle,
     fontFamily: fonts.bold,
     color: '#191F28',
     letterSpacing: -0.5,
@@ -190,8 +162,7 @@ const styles = StyleSheet.create({
 
   menuDescription: {
     marginTop: 8,
-    fontSize:
-      seniorTypography.body,
+    fontSize: seniorTypography.body,
     fontFamily: fonts.regular,
     color: '#8B95A1',
     letterSpacing: -0.2,
