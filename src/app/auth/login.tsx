@@ -39,8 +39,6 @@ import type {
   UserRole,
 } from '@/types/user';
 
-const MOCK_AUTH_CODE = '123456';
-
 type SignupStep =
   | 'name'
   | 'birth'
@@ -193,8 +191,7 @@ export default function LoginScreen() {
       );
     }, [phone]);
 
-  const codeValid =
-    code === MOCK_AUTH_CODE;
+  const codeValid = code.length > 0;
 
   const passwordValid =
     password.length >= 8 &&
@@ -825,25 +822,6 @@ export default function LoginScreen() {
                       maxLength={6}
                     />
 
-                    {step ===
-                      'code' && (
-                      <Text
-                        style={[
-                          styles.mockHint,
-                          {
-                            fontSize:
-                              isSenior
-                                ? 16
-                                : 14,
-                          },
-                        ]}
-                      >
-                        시연용 인증번호:{' '}
-                        {
-                          MOCK_AUTH_CODE
-                        }
-                      </Text>
-                    )}
                   </View>
                 </SlideFadeIn>
               )}
@@ -1216,13 +1194,6 @@ const styles =
       letterSpacing: 4,
       fontFamily:
         fonts.semiBold,
-    },
-
-    mockHint: {
-      marginTop: 10,
-      fontFamily:
-        fonts.regular,
-      color: colors.muted,
     },
 
     errorText: {

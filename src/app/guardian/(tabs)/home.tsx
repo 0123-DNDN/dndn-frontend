@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -10,6 +11,8 @@ import {
 } from 'react-native';
 
 import { colors } from '@/constants/colors';
+import { getNotifications } from '@/services/notification';
+import type { Notification } from '@/types/notification';
 import {
   fonts,
   guardianTypography,
@@ -19,8 +22,29 @@ const CURRENT_STEPS = 1840;
 const TARGET_STEPS = 3000;
 
 export default function GuardianHomeScreen() {
-  // TODO: API 연동 후 실제 값으로 교체
-  const hasRiskAlert = true;
+  const [riskNotification, setRiskNotification] =
+    useState<Notification | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      getNotifications()
+        .then((notifications) => {
+          setRiskNotification(
+            notifications.find(
+              (notification) =>
+                notification.type === 'HIGH_RISK_TRANSFER' &&
+                !notification.isRead &&
+                notification.relatedTransactionId !== null,
+            ) ?? null,
+          );
+        })
+        .catch((error) => {
+          console.warn('GUARDIAN NOTIFICATIONS ERROR:', error);
+        });
+    }, []),
+  );
+
+  const hasRiskAlert = riskNotification !== null;
 
   const cognitiveCompleted = true;
   const voiceCompleted = true;
@@ -38,7 +62,13 @@ export default function GuardianHomeScreen() {
   );
 
   const handleRiskTransaction = () => {
-    router.push('/guardian/transaction/1');
+    if (!riskNotification?.relatedTransactionId) {
+      return;
+    }
+
+    router.push(
+      `/guardian/transaction/${riskNotification.relatedTransactionId}`,
+    );
   };
 
   const handleSendPhoto = () => {

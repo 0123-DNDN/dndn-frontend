@@ -23,54 +23,20 @@ import {
 } from '@/constants/typography';
 import {
   connectAccount,
+  getAvailableAccounts,
   getCurrentUser,
-  verifyAccount,
 } from '@/services/account';
-import type { CurrentUserResponse } from '@/types/account';
-
-type DemoAccount = {
-  id: string;
-  bankCode: string;
-  name: string;
-  accountNumber: string;
-  displayNumber: string;
-  balance: string;
-  balanceValue: number;
-};
-
-const accounts: DemoAccount[] = [
-  {
-    id: '2001',
-    bankCode: '004',
-    name: 'KB 국민 든든통장',
-    accountNumber: '123456789012',
-    displayNumber: '123456-01-****',
-    balance: '3,450,000원',
-    balanceValue: 3450000,
-  },
-  {
-    id: '2004',
-    bankCode: '004',
-    name: 'KB 생활비 통장',
-    accountNumber: '234567890123',
-    displayNumber: '123456-02-****',
-    balance: '1,280,000원',
-    balanceValue: 1280000,
-  },
-  {
-    id: '2005',
-    bankCode: '004',
-    name: 'KB 저축통장',
-    accountNumber: '345678901234',
-    displayNumber: '123456-03-****',
-    balance: '850,000원',
-    balanceValue: 850000,
-  },
-];
+import type {
+  AccountResponse,
+  CurrentUserResponse,
+} from '@/types/account';
 
 export default function AccountConnectScreen() {
   const [selectedIds, setSelectedIds] =
-    useState<string[]>([]);
+    useState<number[]>([]);
+
+  const [accounts, setAccounts] =
+    useState<AccountResponse[]>([]);
 
   const [
     currentUser,
@@ -108,6 +74,9 @@ export default function AccountConnectScreen() {
           await getCurrentUser();
 
         setCurrentUser(user);
+        setAccounts(
+          await getAvailableAccounts(),
+        );
       } catch (error) {
         console.log(
           'GET CURRENT USER ERROR:',
@@ -127,7 +96,7 @@ export default function AccountConnectScreen() {
       const selectedAccounts =
         accounts.filter((account) =>
           selectedIds.includes(
-            account.id,
+            account.accountId,
           ),
         );
 
@@ -142,16 +111,14 @@ export default function AccountConnectScreen() {
           currentPrimary,
           account,
         ) =>
-          account.balanceValue >
-          currentPrimary.balanceValue
+          account.balance >
+          currentPrimary.balance
             ? account
             : currentPrimary,
       );
-    }, [selectedIds]);
+    }, [accounts, selectedIds]);
 
-  const toggleAccount = (
-    accountId: string,
-  ) => {
+  const toggleAccount = (accountId: number) => {
     if (isConnecting) return;
 
     setSelectedIds((prev) => {
@@ -188,7 +155,7 @@ export default function AccountConnectScreen() {
           accounts.filter(
             (account) =>
               selectedIds.includes(
-                account.id,
+                account.accountId,
               ),
           );
 
@@ -203,41 +170,14 @@ export default function AccountConnectScreen() {
           primaryAccount,
           ...selectedAccounts.filter(
             (account) =>
-              account.id !==
-              primaryAccount.id,
+              account.accountId !==
+              primaryAccount.accountId,
           ),
         ];
 
         for (const account of orderedAccounts) {
-          const verifyResult =
-            await verifyAccount({
-              bankCode:
-                account.bankCode,
-              accountNumber:
-                account.accountNumber,
-              accountHolder:
-                currentUser.name,
-              birthDate:
-                currentUser.birthDate,
-            });
-
-          if (
-            !verifyResult.verified
-          ) {
-            throw new Error(
-              `${account.name}: ${verifyResult.message}`,
-            );
-          }
-
           await connectAccount({
-            bankCode:
-              account.bankCode,
-            accountNumber:
-              account.accountNumber,
-            accountName:
-              account.name,
-            birthDate:
-              currentUser.birthDate,
+            accountId: account.accountId,
           });
         }
 
@@ -354,16 +294,16 @@ export default function AccountConnectScreen() {
               ) => {
                 const selected =
                   selectedIds.includes(
-                    account.id,
+                    account.accountId,
                   );
 
-                const isPrimary =
-                  primaryAccount?.id ===
-                  account.id;
+                  const isPrimary =
+                    primaryAccount?.accountId ===
+                    account.accountId;
 
                 return (
                   <SlideFadeIn
-                    key={account.id}
+                    key={account.accountId}
                     delay={
                       240 +
                       index * 70
@@ -383,7 +323,7 @@ export default function AccountConnectScreen() {
                       ]}
                       onPress={() =>
                         toggleAccount(
-                          account.id,
+                          account.accountId,
                         )
                       }
                     >
@@ -397,7 +337,7 @@ export default function AccountConnectScreen() {
                             styles.accountName
                           }
                         >
-                          {account.name}
+                          {account.accountName}
                         </Text>
 
                         <View
@@ -423,7 +363,7 @@ export default function AccountConnectScreen() {
                         }
                       >
                         {
-                          account.displayNumber
+                          account.accountNumber
                         }
                       </Text>
 
@@ -440,7 +380,7 @@ export default function AccountConnectScreen() {
                           styles.balance
                         }
                       >
-                        {account.balance}
+                        {account.balance.toLocaleString()}원
                       </Text>
 
                       {selected &&
@@ -496,7 +436,7 @@ export default function AccountConnectScreen() {
                     }
                   >
                     {
-                      primaryAccount.name
+                      primaryAccount.accountName
                     }
                   </Text>
                 </View>
