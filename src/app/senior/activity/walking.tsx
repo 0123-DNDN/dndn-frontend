@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import {
+  useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   SafeAreaView,
   StyleSheet,
@@ -20,6 +23,13 @@ import {
   fonts,
   seniorTypography,
 } from '@/constants/typography';
+import {
+  getTodayActivityByType,
+  saveActivityResult,
+} from '@/services/activity';
+import type {
+  TodayActivityResponse,
+} from '@/types/activity';
 const TARGET_STEPS = 3000;
 
 const STEP_READ_PERMISSION = {
@@ -48,12 +58,91 @@ export default function WalkingScreen() {
     setErrorMessage,
   ] = useState('');
 
-  useEffect(() => {
-    void loadStepCount(true);
-  }, []);
+  const [
+    targetSteps,
+    setTargetSteps,
+  ] = useState(TARGET_STEPS);
+
+  const appStateRef = useRef(
+    AppState.currentState,
+  );
+
+  const walkingActivityRef =
+    useRef<TodayActivityResponse | null>(null);
+
+  const lastSyncedStepCountRef =
+    useRef<number | null>(null);
+
+  const syncStepCount = useCallback(
+    async (latestStepCount: number) => {
+      if (
+        lastSyncedStepCountRef.current ===
+        latestStepCount
+      ) {
+        return;
+      }
+
+      lastSyncedStepCountRef.current =
+        latestStepCount;
+
+      try {
+        let walkingActivity =
+          walkingActivityRef.current;
+
+        if (!walkingActivity) {
+          walkingActivity =
+            await getTodayActivityByType(
+              'WALKING',
+            );
+
+          if (!walkingActivity) {
+            lastSyncedStepCountRef.current =
+              null;
+            console.log(
+              'WALKING ACTIVITY NOT FOUND',
+            );
+            return;
+          }
+
+          walkingActivityRef.current =
+            walkingActivity;
+
+          if (
+            walkingActivity.targetValue !==
+            null
+          ) {
+            setTargetSteps(
+              walkingActivity.targetValue,
+            );
+          }
+        }
+
+        await saveActivityResult(
+          walkingActivity.activityId,
+          {
+            stepCount: latestStepCount,
+          },
+        );
+      } catch (error) {
+        if (
+          lastSyncedStepCountRef.current ===
+          latestStepCount
+        ) {
+          lastSyncedStepCountRef.current =
+            null;
+        }
+
+        console.log(
+          'WALKING STEP SYNC ERROR:',
+          error,
+        );
+      }
+    },
+    [],
+  );
 
   const loadStepCount =
-    async (
+    useCallback(async (
       isInitialLoad = false,
     ) => {
       if (isInitialLoad) {
@@ -168,8 +257,12 @@ export default function WalkingScreen() {
             },
           });
 
-        setStepCount(
-          result.COUNT_TOTAL ?? 0,
+        const latestStepCount =
+          result.COUNT_TOTAL ?? 0;
+
+        setStepCount(latestStepCount);
+        void syncStepCount(
+          latestStepCount,
         );
       } catch (error) {
         console.log(
@@ -185,10 +278,37 @@ export default function WalkingScreen() {
         setIsLoading(false);
         setIsRefreshing(false);
       }
-    };
+    }, [syncStepCount]);
 
-  const targetSteps =
-    TARGET_STEPS;
+  useEffect(() => {
+    void loadStepCount(true);
+  }, [loadStepCount]);
+
+  useEffect(() => {
+    const subscription =
+      AppState.addEventListener(
+        'change',
+        (nextAppState) => {
+          const wasInBackground =
+            appStateRef.current ===
+              'background' ||
+            appStateRef.current ===
+              'inactive';
+
+          appStateRef.current =
+            nextAppState;
+
+          if (
+            wasInBackground &&
+            nextAppState === 'active'
+          ) {
+            void loadStepCount();
+          }
+        },
+      );
+
+    return () => subscription.remove();
+  }, [loadStepCount]);
 
   const progress =
     targetSteps > 0
@@ -288,8 +408,11 @@ export default function WalkingScreen() {
         </View>
 
         <View
-          style={styles.stepCard}
+          style={styles.stepSection}
         >
+          <View
+            style={styles.stepCard}
+          >
           <View
             style={styles.walkIcon}
           >
@@ -399,40 +522,6 @@ export default function WalkingScreen() {
               남았어요
             </Text>
           )}
-        </View>
-
-        <View
-          style={
-            styles.bottomArea
-          }
-        >
-          {!!errorMessage && (
-            <Text
-              style={
-                styles.errorText
-              }
-            >
-              {errorMessage}
-            </Text>
-          )}
-
-          <View
-            style={styles.infoBox}
-          >
-            <Ionicons
-              name="sync-outline"
-              size={23}
-              color="#6B7684"
-            />
-
-            <Text
-              style={
-                styles.infoText
-              }
-            >
-              Health Connect의 오늘 걸음 수를
-              사용하고 있어요.
-            </Text>
           </View>
 
           <TouchableOpacity
@@ -473,6 +562,16 @@ export default function WalkingScreen() {
               </>
             )}
           </TouchableOpacity>
+
+          {!!errorMessage && (
+            <Text
+              style={
+                styles.errorText
+              }
+            >
+              {errorMessage}
+            </Text>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -495,8 +594,6 @@ const styles =
 
     screen: {
       flex: 1,
-      justifyContent:
-        'space-between',
       paddingHorizontal:
         spacing.page,
       paddingTop: 12,
@@ -533,6 +630,11 @@ const styles =
       fontFamily:
         fonts.regular,
       color: '#6B7684',
+    },
+
+    stepSection: {
+      marginTop: 28,
+      gap: 12,
     },
 
     stepCard: {
@@ -639,29 +741,6 @@ const styles =
       fontFamily:
         fonts.semiBold,
       color: colors.primary,
-    },
-
-    bottomArea: {
-      gap: 12,
-    },
-
-    infoBox: {
-      padding: 18,
-      borderRadius: 18,
-      backgroundColor:
-        '#EEF0F2',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-
-    infoText: {
-      flex: 1,
-      fontSize: 16,
-      lineHeight: 24,
-      fontFamily:
-        fonts.regular,
-      color: '#6B7684',
     },
 
     refreshButton: {
