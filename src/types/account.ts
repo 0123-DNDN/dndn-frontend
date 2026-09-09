@@ -16,10 +16,7 @@ export type AccountVerifyResponse = {
 };
 
 export type AccountConnectRequest = {
-  bankCode: string;
-  accountNumber: string;
-  accountName: string;
-  birthDate: string;
+  accountId: number;
 };
 
 export type AccountResponse = {

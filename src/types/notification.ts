@@ -1,1 +1,10 @@
-export type Notification = { id: string; title: string; message: string; read: boolean };
+export type Notification = {
+	notificationId: number;
+	type: string;
+	title: string;
+	content: string;
+	relatedTransactionId: number | null;
+	isRead: boolean;
+	createdAt: string;
+	readAt: string | null;
+};

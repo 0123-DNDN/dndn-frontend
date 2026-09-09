@@ -32,6 +32,15 @@ export async function verifyAccount(
   return response.data;
 }
 
+export async function getAvailableAccounts(): Promise<AccountResponse[]> {
+  const response =
+    await api.get<AccountResponse[]>(
+      '/api/accounts/available',
+    );
+
+  return response.data;
+}
+
 export async function connectAccount(
   request: AccountConnectRequest,
 ): Promise<AccountResponse> {
