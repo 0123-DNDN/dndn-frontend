@@ -25,6 +25,7 @@ import {
 import {
   getTodayActivities,
 } from '@/services/activity';
+import { getTodayStepCount } from '@/services/healthConnect';
 import type {
   TodayActivityResponse,
 } from '@/types/activity';
@@ -33,6 +34,8 @@ export default function ActivityScreen() {
   const [activities, setActivities] = useState<
     TodayActivityResponse[]
   >([]);
+
+  const [stepCount, setStepCount] = useState(0);
 
   const loadActivities = useCallback(async () => {
     try {
@@ -43,10 +46,23 @@ export default function ActivityScreen() {
     }
   }, []);
 
+  const loadStepCount = useCallback(async () => {
+    try {
+      const result = await getTodayStepCount();
+
+      if (result !== null) {
+        setStepCount(result);
+      }
+    } catch (error) {
+      console.log('HEALTH CONNECT STEPS ERROR:', error);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      loadActivities();
-    }, [loadActivities]),
+      void loadActivities();
+      void loadStepCount();
+    }, [loadActivities, loadStepCount]),
   );
 
   const cognitiveActivity = activities.find(
@@ -82,7 +98,7 @@ export default function ActivityScreen() {
     walkingActivity?.targetValue ?? 3000;
 
   const currentSteps =
-    walkingActivity?.stepCount ?? 0;
+    stepCount;
 
   const walkingProgress = Math.min(
     currentSteps / walkingTarget,

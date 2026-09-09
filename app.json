@@ -12,6 +12,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "permissions": ["android.permission.health.READ_STEPS"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -27,6 +28,17 @@
     },
     "plugins": [
       "expo-router",
+      "react-native-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "minSdkVersion": 26
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {

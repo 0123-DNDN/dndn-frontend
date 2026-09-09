@@ -37,7 +37,6 @@ export async function guardianRejectTransfer(
   return response.data;
 }
 import type { Transfer } from '@/types/transfer';
-import { api } from '@/services/api';
 
 export async function getTransfers(): Promise<Transfer[]> { return []; }
 
