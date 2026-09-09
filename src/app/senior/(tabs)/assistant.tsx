@@ -33,6 +33,11 @@ import {
   getTransfer,
 } from "@/services/transfer";
 import type { TransactionResponse } from "@/types/transaction";
+import {
+  calculateSpeechRate,
+  finishVoiceCapture,
+  recordVoicePause,
+} from "@/utils/voiceCondition";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -85,8 +90,6 @@ const TTS_OPTIONS = {
 } as const;
 
 const TRANSFER_PURPOSE_QUESTION = "어떤 이유로 보내시는 돈인가요?";
-const PAUSE_THRESHOLD_MS = 800;
-const LONG_PAUSE_THRESHOLD_MS = 2000;
 const AUTO_SUBMIT_SILENCE_MS = 1200;
 
 const formatAccountNumber = (accountNumber: string) =>
@@ -485,9 +488,10 @@ export default function AssistantScreen() {
         ? null
         : Math.max(0, now - lastAssistantAtRef.current);
     const isVoice = mode === "voice";
-    const durationSeconds =
-      voiceDurationMs && voiceDurationMs > 0 ? voiceDurationMs / 1000 : null;
-    const spokenUnits = content.replace(/\s+/g, "").length;
+    const speechRate =
+      voiceDurationMs === null
+        ? null
+        : calculateSpeechRate(content, voiceDurationMs);
 
     try {
       const sessionId = await ensureSession();
@@ -510,9 +514,7 @@ export default function AssistantScreen() {
         voiceCondition: isVoice
           ? {
               speechDurationMs: voiceDurationMs,
-              speechRate: durationSeconds
-                ? spokenUnits / durationSeconds
-                : null,
+              speechRate,
               avgPauseDurationMs: lastAvgPauseDurationRef.current,
               longPauseCount: lastLongPauseCountRef.current,
             }
@@ -978,27 +980,16 @@ export default function AssistantScreen() {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-    const finishedAt = Date.now();
-    if (lastVoiceResultAtRef.current !== null) {
-      const finalGap = finishedAt - lastVoiceResultAtRef.current;
-      if (finalGap >= PAUSE_THRESHOLD_MS) {
-        voicePauseDurationsRef.current.push(finalGap);
-      }
-    }
-    const pauses = voicePauseDurationsRef.current;
+    const voiceMetrics = finishVoiceCapture({
+      startedAt: voiceStartedAtRef.current,
+      lastResultAt: lastVoiceResultAtRef.current,
+      pauseDurations: voicePauseDurationsRef.current,
+      finishedAt: Date.now(),
+    });
     lastAvgPauseDurationRef.current =
-      pauses.length > 0
-        ? Math.round(
-            pauses.reduce((sum, pause) => sum + pause, 0) / pauses.length,
-          )
-        : 0;
-    lastLongPauseCountRef.current = pauses.filter(
-      (pause) => pause >= LONG_PAUSE_THRESHOLD_MS,
-    ).length;
-    lastVoiceDurationRef.current =
-      voiceStartedAtRef.current === null
-        ? null
-        : Math.max(0, finishedAt - voiceStartedAtRef.current);
+      voiceMetrics?.avgPauseDurationMs ?? null;
+    lastLongPauseCountRef.current = voiceMetrics?.longPauseCount ?? 0;
+    lastVoiceDurationRef.current = voiceMetrics?.speechDurationMs ?? null;
     voiceStartedAtRef.current = null;
     shouldSubmitVoiceRef.current = true;
     stopSpeechRecognition();
@@ -1047,12 +1038,11 @@ export default function AssistantScreen() {
       return;
 
     const now = Date.now();
-    if (lastVoiceResultAtRef.current !== null) {
-      const gap = now - lastVoiceResultAtRef.current;
-      if (gap >= PAUSE_THRESHOLD_MS) {
-        voicePauseDurationsRef.current.push(gap);
-      }
-    }
+    recordVoicePause(
+      voicePauseDurationsRef.current,
+      lastVoiceResultAtRef.current,
+      now,
+    );
     lastVoiceResultAtRef.current = now;
   }, [isListening, liveTranscript]);
 

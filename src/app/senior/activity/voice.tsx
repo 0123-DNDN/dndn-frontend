@@ -26,10 +26,17 @@ import {
   startVoiceTalkSession,
   submitVoiceTalkAnswer,
 } from '@/services/activity';
+import type { VoiceTalkAnswerRequest } from '@/services/activity';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import type {
   TodayActivityResponse,
 } from '@/types/activity';
+import {
+  calculateSpeechRate,
+  finishVoiceCapture,
+  recordVoicePause,
+} from '@/utils/voiceCondition';
+import type { CapturedVoiceMetrics } from '@/utils/voiceCondition';
 
 export default function VoiceTalkScreen() {
   const [
@@ -51,6 +58,10 @@ export default function VoiceTalkScreen() {
   const [totalQuestions, setTotalQuestions] = useState(4);
   const [summary, setSummary] = useState<string | null>(null);
   const shouldSubmitRef = useRef(false);
+  const voiceStartedAtRef = useRef<number | null>(null);
+  const lastVoiceResultAtRef = useRef<number | null>(null);
+  const voicePauseDurationsRef = useRef<number[]>([]);
+  const pendingVoiceMetricsRef = useRef<CapturedVoiceMetrics | null>(null);
 
   const {
     transcript,
@@ -96,8 +107,22 @@ export default function VoiceTalkScreen() {
     const text = (finalTranscript || transcript).trim();
     if (!text) return;
     shouldSubmitRef.current = false;
-    void submitAnswer(text);
+    const voiceMetrics = pendingVoiceMetricsRef.current;
+    pendingVoiceMetricsRef.current = null;
+    void submitAnswer(text, voiceMetrics);
   }, [finalTranscript, listening, transcript]);
+
+  useEffect(() => {
+    if (!listening || !transcript) return;
+
+    const observedAt = Date.now();
+    recordVoicePause(
+      voicePauseDurationsRef.current,
+      lastVoiceResultAtRef.current,
+      observedAt,
+    );
+    lastVoiceResultAtRef.current = observedAt;
+  }, [listening, transcript]);
 
   const loadActivity =
     async () => {
@@ -128,13 +153,25 @@ export default function VoiceTalkScreen() {
       }
     };
 
+  const beginVoiceListening = async () => {
+    voiceStartedAtRef.current = null;
+    lastVoiceResultAtRef.current = null;
+    voicePauseDurationsRef.current = [];
+    pendingVoiceMetricsRef.current = null;
+
+    const startedListening = await startListening();
+    if (startedListening) {
+      voiceStartedAtRef.current = Date.now();
+    }
+  };
+
   const speakAndListen = (text: string) => {
     cancelListening();
     Speech.stop();
     Speech.speak(text, {
       language: 'ko-KR',
       rate: 0.85,
-      onDone: () => void startListening(),
+      onDone: () => void beginVoiceListening(),
       onStopped: () => undefined,
       onError: () => setErrorMessage('질문을 읽어드리지 못했어요.'),
     });
@@ -160,12 +197,46 @@ export default function VoiceTalkScreen() {
     }
   };
 
-  const submitAnswer = async (text: string) => {
+  const submitAnswer = async (
+    text: string,
+    voiceMetrics: CapturedVoiceMetrics | null,
+  ) => {
     if (sessionId === null) return;
     try {
       setIsSaving(true);
       setErrorMessage('');
-      const response = await submitVoiceTalkAnswer(sessionId, text);
+      const request: VoiceTalkAnswerRequest = { text };
+
+      try {
+        if (voiceMetrics !== null) {
+          const speechRate = calculateSpeechRate(
+            text,
+            voiceMetrics.speechDurationMs,
+          );
+
+          if (speechRate !== null) {
+            request.voiceCondition = {
+              ...voiceMetrics,
+              speechRate,
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('VOICE TALK METRICS BUILD ERROR:', error);
+      }
+
+      if (__DEV__) {
+        console.log('VOICE TALK ANSWER METRICS:', {
+          voiceConditionIncluded: request.voiceCondition !== undefined,
+          speechDurationMs: request.voiceCondition?.speechDurationMs ?? null,
+          speechRate: request.voiceCondition?.speechRate ?? null,
+          avgPauseDurationMs:
+            request.voiceCondition?.avgPauseDurationMs ?? null,
+          longPauseCount: request.voiceCondition?.longPauseCount ?? null,
+        });
+      }
+
+      const response = await submitVoiceTalkAnswer(sessionId, request);
       setAnsweredCount(response.answeredCount);
       resetTranscript();
 
@@ -202,13 +273,25 @@ export default function VoiceTalkScreen() {
       }
 
       if (listening) {
+        try {
+          pendingVoiceMetricsRef.current = finishVoiceCapture({
+            startedAt: voiceStartedAtRef.current,
+            lastResultAt: lastVoiceResultAtRef.current,
+            pauseDurations: voicePauseDurationsRef.current,
+            finishedAt: Date.now(),
+          });
+        } catch (error) {
+          pendingVoiceMetricsRef.current = null;
+          console.warn('VOICE TALK METRICS CAPTURE ERROR:', error);
+        }
+        voiceStartedAtRef.current = null;
         shouldSubmitRef.current = true;
         stopListening();
         return;
       }
 
       resetTranscript();
-      await startListening();
+      await beginVoiceListening();
     };
 
   if (isLoading) {

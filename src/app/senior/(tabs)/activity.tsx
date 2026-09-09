@@ -333,80 +333,6 @@ export default function ActivityScreen() {
             오늘 할 활동
           </Text>
 
-          {/* 인지 게임 */}
-          <View style={styles.activityCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.iconBox}>
-                <Ionicons
-                  name="extension-puzzle-outline"
-                  size={29}
-                  color={colors.primary}
-                />
-              </View>
-
-              <View style={styles.cardTitleArea}>
-                <Text style={styles.cardTitle}>
-                  인지 게임
-                </Text>
-
-                {cognitiveCompleted ? (
-                  <View style={styles.completedStatus}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={21}
-                      color={colors.primary}
-                    />
-
-                    <Text style={styles.completedStatusText}>
-                      완료했어요
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.statusWaiting}>
-                    아직 안 했어요
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            <Text style={styles.cardDescription}>
-              간단한 문제를 풀면서{'\n'}
-              머리를 가볍게 깨워봐요.
-            </Text>
-
-            {!cognitiveCompleted && (
-              <TouchableOpacity
-                style={styles.primaryButton}
-                activeOpacity={0.8}
-                onPress={handleCognitiveGame}
-              >
-                <Text style={styles.primaryButtonText}>
-                  게임 시작하기
-                </Text>
-
-                <Ionicons
-                  name="chevron-forward"
-                  size={22}
-                  color="#FFFFFF"
-                />
-              </TouchableOpacity>
-            )}
-
-            {cognitiveCompleted && (
-              <View style={styles.completedMessage}>
-                <Ionicons
-                  name="checkmark"
-                  size={22}
-                  color={colors.primary}
-                />
-
-                <Text style={styles.completedMessageText}>
-                  오늘의 인지 게임을 완료했어요
-                </Text>
-              </View>
-            )}
-          </View>
-
           {/* 음성 대화 */}
           <View
             style={[
@@ -492,6 +418,86 @@ export default function ActivityScreen() {
                   color="#FFFFFF"
                 />
               </TouchableOpacity>
+            )}
+          </View>
+
+          {/* 인지 게임 */}
+          <View
+            style={[
+              styles.activityCard,
+              cognitiveCompleted &&
+                styles.completedCard,
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="extension-puzzle-outline"
+                  size={29}
+                  color={colors.primary}
+                />
+              </View>
+
+              <View style={styles.cardTitleArea}>
+                <Text style={styles.cardTitle}>
+                  인지 게임
+                </Text>
+
+                {cognitiveCompleted ? (
+                  <View style={styles.completedStatus}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={21}
+                      color={colors.primary}
+                    />
+
+                    <Text style={styles.completedStatusText}>
+                      완료했어요
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.statusWaiting}>
+                    아직 안 했어요
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <Text style={styles.cardDescription}>
+              간단한 문제를 풀면서{'\n'}
+              머리를 가볍게 깨워봐요.
+            </Text>
+
+            {!cognitiveCompleted && (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                activeOpacity={0.8}
+                onPress={handleCognitiveGame}
+              >
+                <Text style={styles.primaryButtonText}>
+                  게임 시작하기
+                </Text>
+
+                <Ionicons
+                  name="chevron-forward"
+                  size={22}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            )}
+
+            {cognitiveCompleted && (
+              <View style={styles.completedMessage}>
+                <Ionicons
+                  name="checkmark"
+                  size={22}
+                  color={colors.primary}
+                />
+
+                <Text style={styles.completedMessageText}>
+                  오늘의 인지 게임을 완료했어요
+                </Text>
+              </View>
             )}
           </View>
 
